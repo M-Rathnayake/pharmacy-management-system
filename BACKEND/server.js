@@ -19,12 +19,34 @@ mongoose.connect(URL,{
 });
 
 const connection = mongoose.connection;
+
 connection.once("open", () =>{
-    console.log("Mongodb Connection Successful!");
+    console.log("MongoDB Connection Successful!");
 })
 
+connection.on("error", (err) => {
+    console.error( "MongoDB connection Error:", err );
+});
+
+// handling inventory routes
+const inventoryRoutes = require("./routes/inventoryRoutes");
+app.use("/api/inventory", inventoryRoutes);
+app.use((req, res) => {
+    res.status(404).json({ error: "Endpoint not Found" });
+});
+// global error handler
+app.use((err, req, res, next) => {
+    console.error( "Server Error:", err.stack );
+    res.status(500).json({ error: "Something went wrong!", message: err.message });
+});
+
+// server initialization
 app.listen(PORT ,()=>{
     console.log('Server is running on port number : ${PORT}')
 })
 
+// unhandled rejections
+process.on("unhandledRejection", (reason, promise) => {
+    console.error("Unhandled Rejection at:", promise, " reason:", reason);
+});
 
