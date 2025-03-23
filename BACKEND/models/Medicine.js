@@ -7,7 +7,7 @@ const medicineSchema = new mongoose.Schema({
     type: String,
     required: [true, "Medicine name is required"],
     trim: true,
-    maxlength: [100, "Nmae cannot exceed 100 characters"],
+    maxlength: [100, "Name cannot exceed 100 characters"],
     index: true
   },
   barcode: {
@@ -55,9 +55,19 @@ const medicineSchema = new mongoose.Schema({
     enum: ["active", "discontinued", "recalled"],
     default: "active"
   },
+  alerts: {
+    lowStockSent: {
+      type: Boolean,
+      default: false
+    },
+    expirySent: {
+      type: Boolean,
+      default: false
+    }
+  },
   transaction: [{
     type: mongoose.Schema.Types.ObjectId,
-    ref: "TransactionIMS" 
+    ref: "IMS_Transaction" 
   }]
 }, {timestamps: true});
 

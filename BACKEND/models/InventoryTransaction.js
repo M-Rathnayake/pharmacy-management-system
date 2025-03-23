@@ -1,7 +1,7 @@
 const mongoose = require ("mongoose");
 const Medicine = require("./Medicine");
 
-const transactionIMSSchema = new mongoose.Schema({
+const imsTransactionSchema = new mongoose.Schema({
     medicineId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "Medicine",
@@ -27,7 +27,7 @@ const transactionIMSSchema = new mongoose.Schema({
 });
 
 // calculating stock values
-transactionIMSSchema.pre("save", async function(next) {
+imsTransactionSchema.pre("save", async function(next) {
     
     const session = await mongoose.startSession();
     session.startTransaction();
@@ -76,4 +76,4 @@ transactionIMSSchema.pre("save", async function(next) {
     }
 });
 
-module.exports = mongoose.model("TransactionIMS", transactionIMSSchema);
+module.exports = mongoose.model("IMS_Transaction", imsTransactionSchema);
