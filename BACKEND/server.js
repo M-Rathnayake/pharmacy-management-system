@@ -11,11 +11,17 @@ require("dotenv").config();
 
 const PORT= process.env.PORT || 8080;
 
+const corsOptions = {
+    origin: 'http://localhost:3000',
+    credentials: true
+  
+};
+
 // configuring alert thresholds
 const LOW_STOCK_THRESHOLD = 10;
 const EXPIRY_WARNING_DAYS = 7;
 
-app.use(cors());
+app.use(cors(corsOptions));
 app.use(bodyParser.json());
 
 const URL = process.env.MONGODB_URL;
@@ -31,13 +37,15 @@ connection.once("open", () =>{
     console.log("MongoDB Connection Successful!");
 
     // sheduling alert checks
-    cron.schedule('0 8 * * *', async () => {
+    cron.schedule('0 11 * * *', async () => {
         try{
             // low stock check
             const lowStockMeds = await Medicine.find({
                 $expr: { $lt: ["$stock", "$threshold"] },
                 'alerts.lowStockSent': false
             });
+
+            console.log(`[CRON] Found ${lowStockMeds.length} low stock items`);
 
             for (const med of lowStockMeds){
                 try{
@@ -49,20 +57,25 @@ connection.once("open", () =>{
                     med.alerts.lowStockSent = true;
                     await med.save();
                 }catch(error){
-                    console.error(`Failed processing ${med._id}:`, error);
+                    console.error(`[CRON] Error processing low stock ${med._id}:`, error.message);
                 }
             }
 
             // near-expiry check
-            const expiryDateThreshold = new Date();
-            expiryDateThreshold.setDate(expiryDateThreshold.getDate() + EXPIRY_WARNING_DAYS);
+            const now = new Date();
+            const startOfToday = new Date(now);
+            startOfToday.setHours(0, 0, 0, 0);
+
+            const expiryDateThreshold = new Date(startOfToday);
+            expiryDateThreshold.setDate(startOfToday.getDate() + EXPIRY_WARNING_DAYS + 1);
+            expiryDateThreshold.setHours(0, 0, 0, 0);
+
+            console.log(`[CRON] Checking expiry between ${startOfToday} and ${expiryDateThreshold}`);
 
             const expiringMeds = await Medicine.find({
                 expiryDate: { 
-                    $exists: true,
-                    $ne: null,
-                    $lte: expiryDateThreshold,
-                    $gte: new Date() 
+                    $gte: startOfToday,
+                    $lt: expiryDateThreshold
                 },
                 'alerts.expirySent': false
             });
@@ -82,11 +95,14 @@ connection.once("open", () =>{
                 }
             }
 
-            console.log(`[CRON] Generated ${lowStockMeds.length + expiringMeds.length} alerts`);
+            console.log(`[CRON] Completed in ${Date.now() - startTime}ms. Generated ${lowStockMeds.length + expiringMeds.length} alerts`);
 
         }catch(error){
             console.error('Alert generation failed:', error);
         }
+    },{
+        scheduled: true,
+        timezone: "Asia/Colombo"
     });
 });
 
@@ -94,6 +110,8 @@ connection.once("open", () =>{
 connection.on("error", (err) => {
     console.error( "MongoDB connection Error:", err );
 });
+
+app.options('*', cors(corsOptions));
 
 // handling medicine routes
 const inventoryRoutes = require("./routes/inventoryRoutes");
