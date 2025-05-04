@@ -12,7 +12,6 @@ export const getTransactions = async (medicineId = null) => {
     return response.data.data || [];
   } catch (error) {
     console.error("Transaction Error:", error.response?.data || error.message);
-    
     return [];
   }
 };
@@ -22,7 +21,17 @@ export const createTransaction = async (transactionData) => {
     const response = await axios.post(API_URL, transactionData);
     return response.data;
   } catch (error) {
-    console.error("Create Transaction Error:", error.response?.data || error.message);
+    console.error("Transaction Creation Error:", error.response?.data || error.message);
+    throw error;
+  }
+};
+
+export const getTransactionById = async (id) => {
+  try {
+    const response = await axios.get(`${API_URL}/${id}`);
+    return response.data.data;
+  } catch (error) {
+    console.error("Transaction Fetch Error:", error.response?.data || error.message);
     throw error;
   }
 };

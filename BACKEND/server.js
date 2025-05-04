@@ -19,7 +19,7 @@ const corsOptions = {
 
 // configuring alert thresholds
 const LOW_STOCK_THRESHOLD = 10;
-const EXPIRY_WARNING_DAYS = 7;
+const EXPIRY_WARNING_DAYS = 30;
 
 app.use(cors(corsOptions));
 app.use(bodyParser.json());
@@ -66,6 +66,28 @@ connection.once("open", () =>{
             const startOfToday = new Date(now);
             startOfToday.setHours(0, 0, 0, 0);
 
+            // Check for expired medicines
+            const expiredMeds = await Medicine.find({
+                expiryDate: { $lt: startOfToday },
+                'alerts.expirySent': false
+            });
+
+            for(const med of expiredMeds) {
+                try {
+                    await Alert.create({
+                        medicineId: med._id,
+                        type: "expired",
+                        message: `${med.name} has expired on ${med.expiryDate.toDateString()}`
+                    });
+
+                    med.alerts.expirySent = true;
+                    await med.save();
+                } catch(error) {
+                    console.error(`Failed expired alert for ${med._id}:`, error);
+                }
+            }
+
+            // Check for near-expiry medicines
             const expiryDateThreshold = new Date(startOfToday);
             expiryDateThreshold.setDate(startOfToday.getDate() + EXPIRY_WARNING_DAYS + 1);
             expiryDateThreshold.setHours(0, 0, 0, 0);
@@ -80,22 +102,23 @@ connection.once("open", () =>{
                 'alerts.expirySent': false
             });
 
-            for(const med of expiringMeds){
-                try{
+            for(const med of expiringMeds) {
+                try {
+                    const daysUntilExpiry = Math.floor((med.expiryDate - startOfToday) / (1000 * 60 * 60 * 24));
                     await Alert.create({
                         medicineId: med._id,
                         type: "near-expiry",
-                        message: `${med.name} expires on ${med.expiryDate.toDateString()}`
+                        message: `${med.name} expires in ${daysUntilExpiry} days (${med.expiryDate.toDateString()})`
                     });
 
                     med.alerts.expirySent = true;
                     await med.save();
-                }catch(error){
-                    console.error(`Failed expiry alert for ${med._id}:`, error)
+                } catch(error) {
+                    console.error(`Failed expiry alert for ${med._id}:`, error);
                 }
             }
 
-            console.log(`[CRON] Completed in ${Date.now() - startTime}ms. Generated ${lowStockMeds.length + expiringMeds.length} alerts`);
+            console.log(`[CRON] Completed in ${Date.now() - startTime}ms. Generated ${lowStockMeds.length + expiringMeds.length + expiredMeds.length} alerts`);
 
         }catch(error){
             console.error('Alert generation failed:', error);

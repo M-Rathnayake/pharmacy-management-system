@@ -1,67 +1,63 @@
-import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Route, Routes, useNavigate } from 'react-router-dom';
-import { Container } from '@mui/material';
-import Dashboard from './components/Inventory/DashboardIMS';
-import MedicineForm from './components/Inventory/MedicineForm';
+import React from 'react';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { ThemeProvider, createTheme } from '@mui/material';
+import StaffLayout from './layouts/StaffLayout';
+
+// Staff Dashboard
+import StaffDashboard from './components/Staff/StaffDashboard';
+
+// Inventory Management
+import DashboardIMS from './components/Inventory/DashboardIMS';
 import MedicineList from './components/Inventory/MedicineList';
-import Alerts from './components/Inventory/Alerts';
+import AddMedicine from './components/Inventory/AddMedicine';
+import EditMedicine from './components/Inventory/EditMedicine';
+import AlertList from './components/Inventory/AlertList';
 import TransactionLogs from './components/Inventory/TransactionLogs';
-import { getMedicines, updateMedicine, addMedicine } from "./services/medicineService";
 
-const App = () => {
+// Placeholder components for other management systems
+const OrderManagement = () => <div>Order Management System (Coming Soon)</div>;
+const SupplierManagement = () => <div>Supplier Management System (Coming Soon)</div>;
+const FinancialManagement = () => <div>Financial Management System (Coming Soon)</div>;
+
+const theme = createTheme({
+  palette: {
+    primary: {
+      main: '#1a237e',
+    },
+    secondary: {
+      main: '#0d47a1',
+    },
+  },
+});
+
+function App() {
   return (
-    <Router>
-      <AppContent />
-    </Router>
+    <ThemeProvider theme={theme}>
+      <Router>
+        <Routes>
+          <Route path="/" element={<StaffLayout />}>
+            {/* Staff Dashboard as main landing page */}
+            <Route index element={<StaffDashboard />} />
+
+            {/* Inventory Management */}
+            <Route path="inventory">
+              <Route index element={<DashboardIMS />} />
+              <Route path="medicines" element={<MedicineList />} />
+              <Route path="medicines/edit/:id" element={<EditMedicine />} />
+              <Route path="add" element={<AddMedicine />} />
+              <Route path="alerts" element={<AlertList />} />
+              <Route path="transactions" element={<TransactionLogs />} />
+            </Route>
+
+            {/* Other Management Systems */}
+            <Route path="orders/*" element={<OrderManagement />} />
+            <Route path="suppliers/*" element={<SupplierManagement />} />
+            <Route path="finance/*" element={<FinancialManagement />} />
+          </Route>
+        </Routes>
+      </Router>
+    </ThemeProvider>
   );
-};
-
-const AppContent = () => {
-  const [medicines, setMedicines] = useState([]);
-  const navigate = useNavigate();
-
-  useEffect(() => {
-    fetchMedicines();
-  }, []);
-
-  const fetchMedicines = async () => {
-    try {
-      const data = await getMedicines();
-      setMedicines(Array.isArray(data) ? data : []);
-    } catch (error) {
-      console.error('Failed to load medicines:', error);
-    }
-  };
-
-  const handleSave = async (medicineData) => {
-    try {
-      if (medicineData._id) {
-        // Update existing medicine
-        await updateMedicine(medicineData._id, medicineData);
-      } else {
-        // Add new medicine
-        await addMedicine(medicineData);
-      }
-      await fetchMedicines(); 
-      navigate('/'); 
-    } catch (error) {
-      console.error('Failed to save medicine:', error);
-    }
-  };
-
-  return (
-    <Container>
-      <Routes>
-        <Route path="/" element={<Dashboard />} />
-        <Route path="/medicines" element={<MedicineList medicines={medicines} />} />
-        <Route path="/add" element={<MedicineForm onSave={handleSave} />} />
-        <Route path="/edit/:id" element={<MedicineForm onSave={handleSave} />} />
-        <Route path="/alerts" element={<Alerts />} />
-        <Route path="/transactions" element={<TransactionLogs />} />
-        <Route path="/transactions/:medicineId" element={<TransactionLogs />} />
-      </Routes>
-    </Container>
-  );
-};
+}
 
 export default App;

@@ -8,7 +8,7 @@ const imsAlertSchema = new mongoose.Schema({
     },
     type: {
         type: String,
-        enum: ["low-stock", "expiry", "near-expiry"],
+        enum: ["low-stock", "near-expiry", "expired"],
         required: [true, "Alert type is required"]
     },
     message: {

@@ -20,12 +20,13 @@ import {
 import { DatePicker, LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import dayjs from 'dayjs';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { getMedicineById } from "../../services/medicineService";
 import { getMedicines } from "../../services/medicineService";
 
 const MedicineForm = ({ onSave }) => {
   const { id } = useParams();
+  const navigate = useNavigate();
   const [medicine, setMedicine] = useState({
     name: '',
     barcode: '',
@@ -108,21 +109,11 @@ const MedicineForm = ({ onSave }) => {
         expiryDate: medicine.expiryDate.toISOString()
       };
       await onSave(medicineToSave);
-
-      if (id) {
-        const stockChange = medicine.stock - originalStock.current;
-        
-        if (stockChange !== 0) {
-          const transactionType = stockChange > 0 ? 'restock' : 'sale';
-          console.log(`Would create ${transactionType} transaction for ${Math.abs(stockChange)} units`);
-        }
-      }
-
     } catch (err) {
       setError(err.message || 'Failed to update medicine');
+      setShowConfirmation(false);
     } finally {
       setIsSubmitting(false);
-      setShowConfirmation(false);
     }
   };
 
@@ -253,20 +244,13 @@ const MedicineForm = ({ onSave }) => {
             helperText={`${medicine.description.length}/500 characters`}
           />
 
-          <Button 
-            variant="contained" 
+          <Button
             type="submit"
-            size="large"
-            sx={{ alignSelf: 'flex-end' }}
+            variant="contained"
             disabled={isSubmitting}
+            sx={{ mt: 2 }}
           >
-            {isSubmitting ? (
-              <CircularProgress size={24} color="inherit" />
-            ) : id ? (
-              "Update Medicine"
-            ) : (
-              "Add Medicine"
-            )}
+            {isSubmitting ? <CircularProgress size={24} /> : (id ? "Update Medicine" : "Add Medicine")}
           </Button>
         </Stack>
       </form>
@@ -274,15 +258,15 @@ const MedicineForm = ({ onSave }) => {
       <Dialog
         open={showConfirmation}
         onClose={handleCancelUpdate}
-        aria-labelledby="alert-dialog-title"
-        aria-describedby="alert-dialog-description"
       >
-        <DialogTitle id="alert-dialog-title">
-          {"Confirm Update"}
+        <DialogTitle>
+          {id ? "Confirm Update" : "Confirm Addition"}
         </DialogTitle>
         <DialogContent>
-          <DialogContentText id="alert-dialog-description">
-            Are you sure you want to update {medicine.name}? This will modify the medicine details in the database.
+          <DialogContentText>
+            {id 
+              ? "Are you sure you want to update this medicine?"
+              : "Are you sure you want to add this new medicine?"}
           </DialogContentText>
         </DialogContent>
         <DialogActions>
@@ -291,15 +275,10 @@ const MedicineForm = ({ onSave }) => {
           </Button>
           <Button 
             onClick={handleConfirmUpdate} 
-            color="primary"
+            variant="contained" 
             disabled={isSubmitting}
-            autoFocus
           >
-            {isSubmitting ? (
-              <CircularProgress size={24} color="inherit" />
-            ) : (
-              "Confirm Update"
-            )}
+            {isSubmitting ? <CircularProgress size={24} /> : "Confirm"}
           </Button>
         </DialogActions>
       </Dialog>

@@ -2,6 +2,19 @@ import axios from "axios";
 
 const API_URL = "http://localhost:8080/api/inventoryAlerts";
 
+export const getAlerts = async () => {
+  try {
+    const response = await axios.get(`${API_URL}`);
+    if (response.data && response.data.success) {
+      return Array.isArray(response.data.data) ? response.data.data : [];
+    }
+    return [];
+  } catch (error) {
+    console.error("Alerts Error:", error.response?.data || error.message);
+    return [];
+  }
+};
+
 export const getAllUnresolvedAlerts = async () => {
   try {
     const response = await axios.get(`${API_URL}`);
@@ -55,14 +68,24 @@ export const checkStockLevels = (medicines) => {
     
     // Check expiry
     const expiryDate = new Date(med.expiryDate);
-    const daysUntilExpiry = Math.floor((expiryDate - new Date()) / (1000 * 60 * 60 * 24));
+    const today = new Date();
+    const daysUntilExpiry = Math.floor((expiryDate - today) / (1000 * 60 * 60 * 24));
     
-    if (daysUntilExpiry < 30) {
+    if (daysUntilExpiry < 0) {
+      newAlerts.push({
+        type: 'expired',
+        medicineId: med._id,
+        medicineName: med.name,
+        message: `${med.name} has expired on ${expiryDate.toLocaleDateString()}`,
+        priority: 'high',
+        createdAt: new Date().toISOString()
+      });
+    } else if (daysUntilExpiry < 30) {
       newAlerts.push({
         type: 'near-expiry',
         medicineId: med._id,
         medicineName: med.name,
-        message: `${med.name} expires in ${daysUntilExpiry} days`,
+        message: `${med.name} expires in ${daysUntilExpiry} days (${expiryDate.toLocaleDateString()})`,
         priority: 'medium',
         createdAt: new Date().toISOString()
       });

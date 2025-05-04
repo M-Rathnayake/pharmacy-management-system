@@ -24,13 +24,6 @@ router.post("/", async (req, res) => {
 // getting all the transactions
 router.get("/", async (req, res) => {
     try{
-        const medicine = await Transaction.find({medicineId: req.params.medicineId});
-        if(!medicine){
-            return res.status(404).json({
-                success: false,
-                error: "Medicine not found"
-            });
-        }
         const transactions = await Transaction.find().populate("medicineId", "name barcode");
         res.status(200).json({
             success: true,
@@ -47,18 +40,19 @@ router.get("/", async (req, res) => {
 // getting transaction for a specific medicine
 router.get("/medicine/:medicineId", async (req, res) => {
     try{
-        const medicine = await Transaction.find({medicineId: req.params.medicineId});
-        if(!medicine){
-            return res.status(404).json({
-                success: false,
-                error: "Medicine not found"
+        const transactions = await Transaction.find({ medicineId: req.params.medicineId })
+            .populate("medicineId", "name barcode");
+            
+        if(!transactions || transactions.length === 0){
+            return res.status(200).json({
+                success: true,
+                data: []
             });
         }
-        const transaction = await Transaction.find().populate("medicineId", "name");
+
         res.status(200).json({
             success: true,
-            medicine: medicine.name,
-            data: transaction
+            data: transactions
         });
     }catch(err){
         res.status(500).json({ 

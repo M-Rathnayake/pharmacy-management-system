@@ -1,4 +1,5 @@
 import axios from "axios";
+import { createTransaction } from "./transactionService";
 
 const API_URL = "http://localhost:8080/api/inventory";
 
@@ -38,13 +39,10 @@ export const addMedicine = async (medicineData) => {
 // Updating a medicine
 export const updateMedicine = async (id, medicineData) => {
   try {
-    
     const currentResponse = await axios.get(`${API_URL}/${id}`);
     const currentMedicine = currentResponse.data;
     
-    const updateResponse = await axios.put(`${API_URL}/${id}`, medicineData);
-    
-    // for mock transaction, creating transaction if stock changed
+    // Create transaction if stock changed
     if (currentMedicine.stock !== medicineData.stock) {
       const quantityDiff = medicineData.stock - currentMedicine.stock;
       const transactionType = quantityDiff > 0 ? 'restock' : 'adjustment';
@@ -53,16 +51,17 @@ export const updateMedicine = async (id, medicineData) => {
         medicineId: id,
         type: transactionType,
         quantity: Math.abs(quantityDiff),
-        notes: `Stock ${transactionType} during medicine update`,
+        notes: `Manual stock ${transactionType} from ${currentMedicine.stock} to ${medicineData.stock}`,
         previousStock: currentMedicine.stock,
         newStock: medicineData.stock
       };
       
-      // Creating mock transaction 
-      createTransaction(transactionPayload)
-        .catch(err => console.warn("Transaction logging failed (non-critical):", err));
+      // Create transaction first
+      await createTransaction(transactionPayload);
     }
     
+    // Then update the medicine
+    const updateResponse = await axios.put(`${API_URL}/${id}`, medicineData);
     return updateResponse.data;
   } catch (error) {
     console.error("Update Error:", error.response?.data || error.message);

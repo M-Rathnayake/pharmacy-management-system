@@ -1,4 +1,4 @@
-const mongoose = require ("mongoose");
+const mongoose = require("mongoose");
 const Medicine = require("./Medicine");
 
 const imsTransactionSchema = new mongoose.Schema({
@@ -27,22 +27,21 @@ const imsTransactionSchema = new mongoose.Schema({
 });
 
 // calculating stock values
-imsTransactionSchema.pre("save", async function(next) {
-    
+imsTransactionSchema.pre('save', async function(next) {
     const session = await mongoose.startSession();
     session.startTransaction();
 
-    try{
+    try {
         // fetching medicine
         const medicine = await Medicine.findById(this.medicineId).session(session).select("stock");
 
-        if(!medicine){
-            throw new Error( "Medicine not found in our Database" );
+        if(!medicine) {
+            throw new Error("Medicine not found in our Database");
         }
 
         this.previousStock = medicine.stock;
 
-        switch(this.type){
+        switch(this.type) {
             case "restock": 
                 this.newStock = medicine.stock + this.quantity;
                 break;
@@ -50,29 +49,28 @@ imsTransactionSchema.pre("save", async function(next) {
             case "adjustment":
             case "expired-writeoff":
                 this.newStock = medicine.stock - this.quantity;
-                if(this.newStock < 0){
+                if(this.newStock < 0) {
                     throw new Error(`Insufficient stock! Current: ${medicine.stock}, Attempted deduction: ${this.quantity}`);
                 }
                 break;
             default:
-                throw new Error( "Invalid transaction type" );
+                throw new Error("Invalid transaction type");
         }
 
-        await Medicine.findByIdAndUpdate(this.medicineId, { $set: {stock: this.newStock}},  {session, new: true});
+        await Medicine.findByIdAndUpdate(
+            this.medicineId, 
+            { $set: { stock: this.newStock }}, 
+            { session, new: true }
+        );
 
         await session.commitTransaction();
         next();
-
-    }catch(error){
-
+    } catch(error) {
         await session.abortTransaction();
         console.error("Transaction failed:", error.message);
         next(error);
-
-    }finally{
-
+    } finally {
         session.endSession();
-
     }
 });
 
