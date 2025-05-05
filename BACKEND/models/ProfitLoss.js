@@ -1,15 +1,34 @@
-const mongoose=require('mongoose');
+const mongoose = require('mongoose');
 
 const profitLossSchema = new mongoose.Schema({
-   state_id:{type: mongoose.Schema.Types.ObjectId, required:true},
-   period:{type:String,required:true},
-   revenue:{type:Number,required:true} ,
-   expenses:{type:Number,required:true},
-   net_Profit:{type:Number,required:true, default:0},
-   created_At:{type:Date,default:Date.now}
-
+  period: {
+    type: String,
+    required: [true, 'Period is required'],
+    trim: true,
+    match: [/^[a-zA-Z0-9-_ ]+$/, 'Please enter a valid period']
+  },
+  revenue: {
+    type: Number,
+    required: [true, 'Revenue is required'],
+    min: [0, 'Revenue cannot be negative']
+  },
+  expenses: {
+    type: Number,
+    required: [true, 'Expenses are required'],
+    min: [0, 'Expenses cannot be negative']
+  },
+  profit: {
+    type: Number,
+    required: true
+  }
+}, {
+  timestamps: true
 });
 
-const profitLoss = mongoose.model('profitLoss', profitLossSchema,'profitlosses');
+// Auto-calculate profit before saving
+profitLossSchema.pre('save', function(next) {
+  this.profit = this.revenue - this.expenses;
+  next();
+});
 
-module.exports = profitLoss;
+module.exports = mongoose.model('ProfitLoss', profitLossSchema);

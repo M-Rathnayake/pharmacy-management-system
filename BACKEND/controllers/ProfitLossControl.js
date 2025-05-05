@@ -1,56 +1,98 @@
-const ProfitLoss = require("../models/ProfitLoss"); 
+const { body, validationResult } = require('express-validator');
+const ProfitLoss = require("../models/ProfitLoss");
 
-// Controller functions
-const getProfitLoss = async (req, res) => {
-    try {
-        const data = await ProfitLoss.find(); // Fetch all profit/loss records
-        res.status(200).json(data);
-    } catch (error) {
-        res.status(500).json({ message: "Error retrieving profit/loss data", error });
+const validateProfitLossEntry = [
+  body('period')
+    .notEmpty().withMessage('Period is required')
+    .trim(),
+  
+  body('revenue')
+    .isFloat({ min: 0 }).withMessage('Revenue must be a positive number'),
+  
+  body('expenses')
+    .isFloat({ min: 0 }).withMessage('Expenses must be a positive number'),
+
+  (req, res, next) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
     }
+    next();
+  }
+];
+
+const getProfitLoss = async (req, res) => {
+  try {
+    const data = await ProfitLoss.find().sort({ period: -1 });
+    res.status(200).json(data);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to fetch profit/loss data" });
+  }
 };
 
 const addProfitLoss = async (req, res) => {
-    const { date, revenue, expenses, profit } = req.body;
+  try {
+    const { period, revenue, expenses } = req.body;
+    const profit = revenue - expenses;
+    
+    const newEntry = new ProfitLoss({
+      period,
+      revenue,
+      expenses,
+      profit
+    });
 
-    try {
-        const newEntry = new ProfitLoss({ date, revenue, expenses, profit });
-        await newEntry.save();
-        res.status(201).json({ message: "Profit/Loss entry added successfully", newEntry });
-    } catch (error) {
-        res.status(500).json({ message: "Error adding profit/loss entry", error });
+    const savedEntry = await newEntry.save();
+    res.status(201).json(savedEntry);
+  } catch (error) {
+    if (error.code === 11000) {
+      return res.status(400).json({ error: "Entry for this period already exists" });
     }
+    res.status(500).json({ error: "Failed to create new entry" });
+  }
 };
 
 const updateProfitLoss = async (req, res) => {
+  try {
     const { id } = req.params;
-    const { revenue, expenses, profit } = req.body;
+    const { revenue, expenses } = req.body;
+    const profit = revenue - expenses;
 
-    try {
-        const updatedEntry = await ProfitLoss.findByIdAndUpdate(
-            id,
-            { revenue, expenses, profit },
-            { new: true }
-        );
-        if (!updatedEntry) return res.status(404).json({ message: "Entry not found" });
+    const updatedEntry = await ProfitLoss.findByIdAndUpdate(
+      id,
+      { ...req.body, profit },
+      { new: true, runValidators: true }
+    );
 
-        res.status(200).json({ message: "Profit/Loss entry updated", updatedEntry });
-    } catch (error) {
-        res.status(500).json({ message: "Error updating profit/loss entry", error });
+    if (!updatedEntry) {
+      return res.status(404).json({ error: "Entry not found" });
     }
+
+    res.status(200).json(updatedEntry);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to update entry" });
+  }
 };
 
 const deleteProfitLoss = async (req, res) => {
+  try {
     const { id } = req.params;
+    const deletedEntry = await ProfitLoss.findByIdAndDelete(id);
 
-    try {
-        const deletedEntry = await ProfitLoss.findByIdAndDelete(id);
-        if (!deletedEntry) return res.status(404).json({ message: "Entry not found" });
-
-        res.status(200).json({ message: "Profit/Loss entry deleted", deletedEntry });
-    } catch (error) {
-        res.status(500).json({ message: "Error deleting profit/loss entry", error });
+    if (!deletedEntry) {
+      return res.status(404).json({ error: "Entry not found" });
     }
+
+    res.status(200).json({ message: "Entry deleted successfully" });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to delete entry" });
+  }
 };
 
-module.exports = { getProfitLoss, addProfitLoss, updateProfitLoss, deleteProfitLoss };
+module.exports = {
+  validateProfitLossEntry,
+  getProfitLoss,
+  addProfitLoss,
+  updateProfitLoss,
+  deleteProfitLoss
+};

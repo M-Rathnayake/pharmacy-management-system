@@ -1,11 +1,54 @@
 const express = require('express');
 const router = express.Router();
-const ProfitLossController = require("../controllers/ProfitLossControl");
+const {
+  validateProfitLossEntry,
+  addProfitLoss,
+  getProfitLoss,
+  updateProfitLoss,
+  deleteProfitLoss
+} = require('../controllers/ProfitLossControl');
 
-// Define Routes
-router.post('/profitloss',ProfitLossController.addProfitLoss);  // POST request to add profit/loss
-router.get('/profitloss', ProfitLossController.getProfitLoss);   // GET request to fetch all records
-router.put('/profitloss/:_id', ProfitLossController.updateProfitLoss);  // PUT request to update a record
-router.delete('/profitloss/:_id', ProfitLossController.deleteProfitLoss);  // DELETE request to remove a record
+// Create a new profit/loss entry
+router.post('/', 
+  validateProfitLossEntry, 
+  addProfitLoss
+);
+
+// Get all profit/loss entries
+router.get('/', 
+  getProfitLoss
+);
+
+// Get a specific profit/loss entry by period
+router.get('/period/:period', 
+  async (req, res, next) => {
+    try {
+      const entry = await ProfitLoss.findOne({ period: req.params.period });
+      if (!entry) {
+        return res.status(404).json({ error: 'Entry not found' });
+      }
+      res.json(entry);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// Update a profit/loss entry
+router.put('/:id',
+  validateProfitLossEntry,
+  updateProfitLoss
+);
+
+// Delete a profit/loss entry
+router.delete('/:id',
+  deleteProfitLoss
+);
+
+// Error handling middleware
+router.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(500).json({ error: 'Something went wrong!' });
+});
 
 module.exports = router;

@@ -1,15 +1,34 @@
-const mongoose= new require('mongoose');
+const mongoose = require('mongoose');
 
-//defining a new collection(schema)
-const bankBookSchema=new mongoose.Schema({
-    bankbook_id:{type:mongoose.Schema.Types.ObjectID,required:true},
-    date:{type:Date,required:true},
-    description:{type:String,required:true},
-    voucher_no:{type:Number},
-    deposists:{type:Number},
-    withdrawal:{type:Number},
-    balance:{type:Number,required:true},
-})
+const bankBookSchema = new mongoose.Schema({
+  bankbook_id: {
+    type: String,
+    required: true,
+    unique: true
+  },
+  date: {
+    type: Date,
+    required: true
+  },
+  description: {
+    type: String,
+    required: true
+  },
+  voucher_no: String,
+  deposits: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
+  withdrawal: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
+  balance: {
+    type: Number,
+    required: true
+  }
+}, { timestamps: true });
 
-const BankBook = new mongoose.model('BankBook',bankBookSchema);
-module.exports=BankBook;
+module.exports = mongoose.model('BankBook', bankBookSchema);

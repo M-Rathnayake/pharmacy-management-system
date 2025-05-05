@@ -1,11 +1,21 @@
 const express = require('express');
 const router = express.Router();
-const BalanceSheetController = require("../controllers/BalanceSheetControl");
+const {
+    validateBalanceSheet,
+    createBalanceSheet,
+    getBalanceSheets,
+    getBalanceSheetById,
+    updateBalanceSheet,
+    deleteBalanceSheet,
+    getLatestBalanceSheet
+} = require('../controllers/balanceSheetControl');
 
-// Define Routes
-router.post('/balancesheet', BalanceSheetController.addBalance);  // POST request to add a balance sheet entry
-router.get('/balancesheet', BalanceSheetController.getBalance);   // GET request to fetch all balance sheets
-router.put('/balancesheet/:b_id', BalanceSheetController.updateBalance);  // PUT request to update a balance sheet entry
-router.delete('/balancesheet/:b_id', BalanceSheetController.deleteBalance);  // DELETE request to remove a balance sheet entry
+// CRUD routes
+router.post('/', validateBalanceSheet, createBalanceSheet);
+router.get('/', getBalanceSheets);
+router.get('/latest', getLatestBalanceSheet);
+router.get('/:id', getBalanceSheetById);
+router.put('/:id', validateBalanceSheet, updateBalanceSheet);
+router.delete('/:id', deleteBalanceSheet);
 
 module.exports = router;

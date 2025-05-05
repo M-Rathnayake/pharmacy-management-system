@@ -1,11 +1,16 @@
 const express = require('express');
 const router = express.Router();
-const BankBookController = require("../controllers/BankBookControl"); // Import the BankBookController
+const { 
+  validateBankBookEntry,
+  addBankBook,
+  getBankBooks,
+  updateBankBook,
+  deleteBankBook
+} = require('../controllers/BankBookControl');
 
-// Define Routes
-router.post('/bankbook', BankBookController.addBankBook);  // POST request to add bank book entry
-router.get('/bankbook', BankBookController.getBankBooks);   // GET request to fetch all records
-router.put('/bankbook/:id', BankBookController.updateBankBook);  // PUT request to update a record
-router.delete('/bankbook/:id', BankBookController.deleteBankBook);  // DELETE request to remove a record
+router.post('/', validateBankBookEntry, addBankBook);
+router.get('/', getBankBooks);
+router.put('/:bankbook_id', validateBankBookEntry, updateBankBook);
+router.delete('/:bankbook_id', deleteBankBook);
 
 module.exports = router;
