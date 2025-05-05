@@ -43,6 +43,13 @@ const managementSystems = [
     color: '#1565c0'
   },
   {
+    title: 'Customer Management',
+    description: 'Manage customer records and profiles',
+    icon: <People sx={{ fontSize: 40 }} />,
+    path: '/customers',
+    color: '#1976d2'
+  },
+  {
     title: 'Financial Management',
     description: 'Track sales, expenses, and financial reports',
     icon: <AttachMoney sx={{ fontSize: 40 }} />,

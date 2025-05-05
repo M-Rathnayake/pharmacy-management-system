@@ -15,14 +15,19 @@ import {
   DialogTitle,
   DialogContent,
   DialogContentText,
-  DialogActions
+  DialogActions,
+  IconButton,
+  InputAdornment
 } from '@mui/material';
 import { DatePicker, LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
+import { CameraAlt } from '@mui/icons-material';
 import dayjs from 'dayjs';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getMedicineById } from "../../services/medicineService";
 import { getMedicines } from "../../services/medicineService";
+import BarcodeScanner from './BarcodeScanner';
+import { getMedicineByBarcode } from '../../data/medicineDatabase';
 
 const MedicineForm = ({ onSave }) => {
   const { id } = useParams();
@@ -42,6 +47,7 @@ const MedicineForm = ({ onSave }) => {
   const [error, setError] = useState(null);
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showScanner, setShowScanner] = useState(false);
   
   const originalStock = useRef(0);
 
@@ -121,6 +127,32 @@ const MedicineForm = ({ onSave }) => {
     setShowConfirmation(false);
   };
 
+  const handleBarcodeScan = (barcode) => {
+    setShowScanner(false);
+    const trimmedBarcode = barcode.trim();
+    const medicineData = getMedicineByBarcode(trimmedBarcode);
+    console.log('Scanned barcode:', trimmedBarcode, 'Medicine data:', medicineData);
+    if (medicineData) {
+      setMedicine({
+        ...medicine,
+        barcode: trimmedBarcode,
+        name: medicineData.name || '',
+        category: medicineData.category || '',
+        description: medicineData.description || '',
+        threshold: medicineData.threshold || 10,
+        stock: medicine.stock,
+        expiryDate: medicine.expiryDate,
+        supplierId: medicine.supplierId,
+        status: medicine.status
+      });
+    } else {
+      setMedicine({
+        ...medicine,
+        barcode: trimmedBarcode
+      });
+    }
+  };
+
   if (loading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
@@ -160,6 +192,25 @@ const MedicineForm = ({ onSave }) => {
               onChange={(e) => setMedicine({...medicine, barcode: e.target.value})}
               required
               fullWidth
+              InputProps={{
+                endAdornment: (
+                  <InputAdornment position="end">
+                    <IconButton 
+                      onClick={() => setShowScanner(true)}
+                      edge="end"
+                      sx={{ 
+                        color: 'primary.main',
+                        '&:hover': {
+                          backgroundColor: 'primary.light',
+                          color: 'primary.dark'
+                        }
+                      }}
+                    >
+                      <CameraAlt />
+                    </IconButton>
+                  </InputAdornment>
+                )
+              }}
             />
           </Stack>
 
@@ -254,6 +305,21 @@ const MedicineForm = ({ onSave }) => {
           </Button>
         </Stack>
       </form>
+
+      {/* Barcode Scanner Dialog */}
+      <Dialog
+        open={showScanner}
+        onClose={() => setShowScanner(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogContent>
+          <BarcodeScanner 
+            onScan={handleBarcodeScan}
+            onClose={() => setShowScanner(false)}
+          />
+        </DialogContent>
+      </Dialog>
 
       <Dialog
         open={showConfirmation}

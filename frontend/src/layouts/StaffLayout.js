@@ -26,7 +26,8 @@ import {
   AttachMoney as FinanceIcon,
   Business as SupplierIcon,
   ExitToApp as LogoutIcon,
-  ChevronLeft as ChevronLeftIcon
+  ChevronLeft as ChevronLeftIcon,
+  People as PeopleIcon
 } from '@mui/icons-material';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 
@@ -56,6 +57,12 @@ const menuItems = [
     path: '/suppliers',
     icon: <SupplierIcon />,
     description: 'Manage suppliers'
+  },
+  {
+    title: 'Customer Management',
+    path: '/customers',
+    icon: <PeopleIcon />,
+    description: 'Manage customers'
   },
   {
     title: 'Financial Management',
@@ -96,7 +103,7 @@ const StaffLayout = () => {
   };
 
   const drawer = (
-    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+    <Box sx={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
       {/* Logo/Brand Section */}
       <Box sx={{ p: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
         <PharmacyIcon sx={{ fontSize: 32, color: 'primary.main' }} />
@@ -108,43 +115,45 @@ const StaffLayout = () => {
       <Divider />
 
       {/* Navigation Menu */}
-      <List sx={{ flex: 1, px: 2 }}>
-        {menuItems.map((item) => (
-          <ListItem key={item.path} disablePadding sx={{ mb: 1 }}>
-            <ListItemButton
-              selected={location.pathname === item.path || (location.pathname.startsWith(item.path + '/') && !isInventorySection)}
-              onClick={() => handleNavigation(item.path)}
-              sx={{
-                borderRadius: 1,
-                '&.Mui-selected': {
-                  backgroundColor: 'primary.main',
-                  color: 'white',
-                  '&:hover': {
-                    backgroundColor: 'primary.dark',
-                  },
-                  '& .MuiListItemIcon-root': {
+      <Box sx={{ flex: 1, overflowY: 'auto' }}>
+        <List sx={{ px: 2 }}>
+          {menuItems.map((item) => (
+            <ListItem key={item.path} disablePadding sx={{ mb: 1 }}>
+              <ListItemButton
+                selected={location.pathname === item.path || (location.pathname.startsWith(item.path + '/') && !isInventorySection)}
+                onClick={() => handleNavigation(item.path)}
+                sx={{
+                  borderRadius: 1,
+                  '&.Mui-selected': {
+                    backgroundColor: 'primary.main',
                     color: 'white',
+                    '&:hover': {
+                      backgroundColor: 'primary.dark',
+                    },
+                    '& .MuiListItemIcon-root': {
+                      color: 'white',
+                    },
                   },
-                },
-              }}
-            >
-              <ListItemIcon sx={{ minWidth: 40 }}>
-                {item.icon}
-              </ListItemIcon>
-              <ListItemText 
-                primary={item.title}
-                secondary={item.description}
-                secondaryTypographyProps={{
-                  sx: { 
-                    opacity: 0.7,
-                    display: { xs: 'none', sm: 'block' }
-                  }
                 }}
-              />
-            </ListItemButton>
-          </ListItem>
-        ))}
-      </List>
+              >
+                <ListItemIcon sx={{ minWidth: 40 }}>
+                  {item.icon}
+                </ListItemIcon>
+                <ListItemText 
+                  primary={item.title}
+                  secondary={item.description}
+                  secondaryTypographyProps={{
+                    sx: { 
+                      opacity: 0.7,
+                      display: { xs: 'none', sm: 'block' }
+                    }
+                  }}
+                />
+              </ListItemButton>
+            </ListItem>
+          ))}
+        </List>
+      </Box>
 
       {/* User Profile Section */}
       <Box sx={{ p: 2, borderTop: 1, borderColor: 'divider' }}>
