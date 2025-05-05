@@ -2,11 +2,11 @@ import React, { useState, useEffect } from 'react';
 import {
   Box, Grid, Typography, Paper, Divider, useTheme,
   Card, CardContent, Avatar, Chip, Button, CircularProgress,
-  Snackbar, Alert, List, ListItem, ListItemIcon, ListItemText
+  Snackbar, Alert, List, ListItem, ListItemIcon, ListItemText, IconButton
 } from '@mui/material';
 import {
   MonetizationOn, TrendingUp, NotificationsActive, 
-  AccountBalance, ShowChart, Savings, Timeline, Lightbulb
+  AccountBalance, ShowChart, Savings, Timeline, Lightbulb, Autorenew
 } from '@mui/icons-material';
 import {
   BarChart, Bar, LineChart, Line, PieChart, Pie, XAxis, YAxis,
@@ -22,6 +22,8 @@ const MainForm = () => {
   const [totalProfit, setTotalProfit] = useState(0);
   const [financialTips, setFinancialTips] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [tipsLoading, setTipsLoading] = useState(false);
+  const [lastGenerated, setLastGenerated] = useState(null);
   const [alertMsg, setAlertMsg] = useState({ open: false, text: '', severity: 'error' });
 
   useEffect(() => {
@@ -88,12 +90,24 @@ const MainForm = () => {
       const expensesSum = validData.reduce((sum, item) => sum + (item.expenses || 0), 0);
       const profitSum = revenueSum - expensesSum;
 
+      console.log('Processed profit/loss data:', {
+        validRecords: validData.length,
+        totalRevenue: revenueSum,
+        totalExpenses: expensesSum,
+        totalProfit: profitSum,
+        monthlyData: JSON.stringify(mappedData, null, 2)
+      });
+
       setMonthlyData(mappedData);
       setTotalRevenue(revenueSum);
       setTotalExpenses(expensesSum);
       setTotalProfit(profitSum);
     } catch (error) {
-      console.error('Error fetching profit/loss data:', error.response?.data || error.message);
+      console.error('Error fetching profit/loss data:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status
+      });
       setAlertMsg({
         open: true,
         text: error.response?.data?.error || 'Error fetching financial data. Please try again.',
@@ -106,6 +120,7 @@ const MainForm = () => {
 
   const fetchFinancialTips = async () => {
     try {
+      setTipsLoading(true);
       const payload = {
         totalRevenue,
         totalExpenses,
@@ -113,25 +128,40 @@ const MainForm = () => {
         profitMargin: totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0,
         periods: monthlyData.length
       };
-      console.log('Fetching tips with payload:', JSON.stringify(payload, null, 2));
-      const response = await axios.post('http://localhost:8080/api/financial-tips', payload);
-      console.log('Financial tips response:', JSON.stringify(response.data, null, 2));
-      setFinancialTips(response.data.tips || []);
-      if (!response.data.tips || response.data.tips.length === 0) {
-        setAlertMsg({
-          open: true,
-          text: 'No financial tips generated. Try adding more data or adjusting values.',
-          severity: 'info'
-        });
+      
+      const response = await axios.post('http://localhost:8080/api/financial-tips', payload, {
+        timeout: 5000 // 5 second timeout
+      });
+      
+      if (!response.data?.tips) {
+        throw new Error('Invalid response format from server');
       }
+      
+      setFinancialTips(response.data.tips);
+      setLastGenerated(new Date());
+      
     } catch (error) {
-      console.error('Error fetching financial tips:', error.response?.data || error.message);
+      console.error('AI Tips Error:', {
+        error: error.message,
+        request: error.config?.data,
+        response: error.response?.data
+      });
+      
+      // User-friendly fallback tips
+      setFinancialTips([
+        "⚠️ Our financial advisor is currently unavailable",
+        "💡 Suggested Action: Review your expense categories",
+        "📌 Immediate Tip: Postpone non-critical spending this week"
+      ]);
+      
       setAlertMsg({
         open: true,
-        text: 'Error fetching financial tips. Please try again.',
-        severity: 'error'
+        text: `AI Service Temporarily Down: ${error.message}`,
+        severity: 'warning'
       });
-      setFinancialTips([]);
+      
+    } finally {
+      setTipsLoading(false);
     }
   };
 
@@ -192,6 +222,64 @@ const MainForm = () => {
       </Box>
     );
   }
+
+  const renderAITipsSection = () => (
+    <Paper sx={{ p: 3, position: 'relative' }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+        <Lightbulb color="warning" sx={{ mr: 1, fontSize: 30 }} />
+        <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+          Financial Advisor
+        </Typography>
+      </Box>
+
+      {tipsLoading ? (
+        <Box sx={{ display: 'flex', alignItems: 'center', p: 3 }}>
+          <CircularProgress size={24} sx={{ mr: 2 }} />
+          <Typography>Consulting with financial AI...</Typography>
+        </Box>
+      ) : (
+        <List dense>
+          {financialTips.map((tip, index) => (
+            <ListItem key={index} sx={{ 
+              py: 1,
+              backgroundColor: tip.startsWith('⚠️') ? '#FFF3E0' : 'transparent',
+              borderRadius: 1
+            }}>
+              <ListItemIcon>
+                {tip.startsWith('⚠️') ? (
+                  <NotificationsActive color="error" />
+                ) : tip.startsWith('💡') ? (
+                  <Lightbulb color="warning" />
+                ) : (
+                  <TrendingUp color="primary" />
+                )}
+              </ListItemIcon>
+              <ListItemText 
+                primary={tip} 
+                primaryTypographyProps={{
+                  fontWeight: tip.startsWith('⚠️') ? 'bold' : 'normal'
+                }}
+              />
+            </ListItem>
+          ))}
+        </List>
+      )}
+      
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 2 }}>
+        <Typography variant="caption" color="text.secondary">
+          {lastGenerated ? `Last updated: ${lastGenerated.toLocaleTimeString()}` : ''}
+        </Typography>
+        <Button 
+          size="small" 
+          startIcon={<Autorenew />}
+          onClick={fetchFinancialTips}
+          disabled={tipsLoading}
+        >
+          Refresh Advice
+        </Button>
+      </Box>
+    </Paper>
+  );
 
   return (
     <Box sx={{ p: 3 }}>
@@ -328,30 +416,7 @@ const MainForm = () => {
         </Grid>
 
         <Grid item xs={12} md={4}>
-          <Paper sx={{ p: 3 }}>
-            <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold' }}>
-              <Lightbulb sx={{ mr: 1, color: theme.palette.warning.main }} />
-              AI Financial Tips
-            </Typography>
-            {financialTips.length > 0 ? (
-              <List>
-                {financialTips.map((tip, index) => (
-                  <ListItem key={index} sx={{ py: 0.5 }}>
-                    <ListItemIcon>
-                      <Lightbulb color="warning" />
-                    </ListItemIcon>
-                    <ListItemText primary={tip} />
-                  </ListItem>
-                ))}
-              </List>
-            ) : (
-              <Typography variant="body2" sx={{ fontStyle: 'italic' }}>
-                {monthlyData.length > 0 
-                  ? 'No specific tips available. Try adjusting revenue or expenses.'
-                  : 'No tips available. Add more data in the Profit/Loss Form.'}
-              </Typography>
-            )}
-          </Paper>
+          {renderAITipsSection()}
         </Grid>
 
         <Grid item xs={12} md={4}>

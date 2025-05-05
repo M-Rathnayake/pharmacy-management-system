@@ -1,112 +1,155 @@
-const { body, validationResult } = require('express-validator');
+const { validationResult } = require('express-validator');
 const BankBook = require('../models/BankBook');
 
-const validateBankBookEntry = [
-  body('date')
-    .isISO8601().withMessage('Invalid date format (use YYYY-MM-DD)')
-    .custom(value => {
-      const date = new Date(value);
-      if (isNaN(date.getTime())) throw new Error('Invalid date');
-      if (date.getFullYear() < 2000) throw new Error('Year must be 2000 or later');
-      return true;
-    }),
-  
-  body('description').notEmpty().withMessage('Description is required'),
-  
-  body('deposits')
-    .optional()
-    .isFloat({ min: 0 }).withMessage('Deposits cannot be negative'),
-    
-  body('withdrawal')
-    .optional()
-    .isFloat({ min: 0 }).withMessage('Withdrawal cannot be negative'),
-    
-  body('balance')
-    .isFloat().withMessage('Balance must be a number')
-    .custom((value, { req }) => {
-      const deposits = parseFloat(req.body.deposits) || 0;
-      const withdrawal = parseFloat(req.body.withdrawal) || 0;
-      const expectedBalance = deposits - withdrawal;
-      if (Math.abs(parseFloat(value) - expectedBalance) > 0.01) {
-        throw new Error(`Balance should be ${expectedBalance.toFixed(2)}`);
-      }
-      return true;
-    }),
-    
-  (req, res, next) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({ errors: errors.array() });
-    }
-    next();
+const validateBankBookEntry = (req, res, next) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    console.error('Validation errors:', errors.array());
+    return res.status(400).json({ 
+      error: 'Validation failed',
+      details: errors.array().map(err => ({
+        field: err.param,
+        message: err.msg
+      }))
+    });
   }
-];
+  next();
+};
 
 const addBankBook = async (req, res) => {
   try {
-    const { date, description, voucher_no, deposits, withdrawal, balance } = req.body;
-    const bankbook_id = Date.now().toString(); // Generate timestamp ID
+    const { date, description, voucher_no, deposits = 0, withdrawal = 0 } = req.body;
 
-    const newEntry = new BankBook({
-      bankbook_id,
-      date: new Date(date),
+    // Auto-calculate balance
+    const balance = Number(deposits) - Number(withdrawal);
+
+    const newEntry = await BankBook.create({
+      date,
       description,
-      voucher_no,
-      deposits: Number(deposits) || 0,
-      withdrawal: Number(withdrawal) || 0,
-      balance: Number(balance)
+      voucher_no: voucher_no || null,
+      deposits,
+      withdrawal,
+      balance
     });
 
-    const savedBankBook = await newEntry.save();
-    res.status(201).json(savedBankBook);
+    res.status(201).json({
+      message: 'Entry created successfully',
+      data: newEntry
+    });
+
   } catch (error) {
-    if (error.code === 11000) {
-      return res.status(400).json({ error: "Bankbook entry already exists" });
+    console.error('Create error:', error);
+    
+    if (error.name === 'ValidationError') {
+      const errors = Object.values(error.errors).map(err => ({
+        field: err.path,
+        message: err.message
+      }));
+      return res.status(400).json({ 
+        error: 'Validation failed',
+        details: errors
+      });
     }
-    res.status(500).json({ error: error.message });
+    
+    res.status(500).json({ 
+      error: 'Server error',
+      message: error.message 
+    });
   }
 };
 
 const getBankBooks = async (req, res) => {
   try {
-    const data = await BankBook.find().sort({ date: -1 });
-    res.json(data);
+    const entries = await BankBook.find().sort({ date: -1, createdAt: -1 });
+    res.json(entries);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error('Fetch error:', error);
+    res.status(500).json({ 
+      error: 'Server error',
+      message: error.message 
+    });
   }
 };
 
 const updateBankBook = async (req, res) => {
   try {
     const { bankbook_id } = req.params;
-    const updatedEntry = await BankBook.findOneAndUpdate(
-      { bankbook_id },
-      req.body,
+    const { date, description, voucher_no, deposits = 0, withdrawal = 0 } = req.body;
+
+    // Auto-calculate balance
+    const balance = Number(deposits) - Number(withdrawal);
+
+    const updatedEntry = await BankBook.findByIdAndUpdate(
+      bankbook_id,
+      {
+        date,
+        description,
+        voucher_no: voucher_no || null,
+        deposits,
+        withdrawal,
+        balance
+      },
       { new: true, runValidators: true }
     );
 
     if (!updatedEntry) {
-      return res.status(404).json({ error: "Entry not found" });
+      return res.status(404).json({ error: 'Entry not found' });
     }
 
-    res.json(updatedEntry);
+    res.json({
+      message: 'Entry updated successfully',
+      data: updatedEntry
+    });
+
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error('Update error:', error);
+    
+    if (error.name === 'CastError') {
+      return res.status(400).json({ error: 'Invalid ID format' });
+    }
+    if (error.name === 'ValidationError') {
+      const errors = Object.values(error.errors).map(err => ({
+        field: err.path,
+        message: err.message
+      }));
+      return res.status(400).json({ 
+        error: 'Validation failed',
+        details: errors
+      });
+    }
+    
+    res.status(500).json({ 
+      error: 'Server error',
+      message: error.message 
+    });
   }
 };
 
 const deleteBankBook = async (req, res) => {
   try {
     const { bankbook_id } = req.params;
-    const deletedEntry = await BankBook.findOneAndDelete({ bankbook_id });
+    const deletedEntry = await BankBook.findByIdAndDelete(bankbook_id);
 
     if (!deletedEntry) {
-      return res.status(404).json({ error: "Entry not found" });
+      return res.status(404).json({ error: 'Entry not found' });
     }
 
-    res.json({ message: "Entry deleted successfully" });
+    res.json({ 
+      message: 'Entry deleted successfully',
+      deletedId: bankbook_id
+    });
+
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error('Delete error:', error);
+    
+    if (error.name === 'CastError') {
+      return res.status(400).json({ error: 'Invalid ID format' });
+    }
+    
+    res.status(500).json({ 
+      error: 'Server error',
+      message: error.message 
+    });
   }
 };
 
