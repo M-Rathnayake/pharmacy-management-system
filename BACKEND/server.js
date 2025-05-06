@@ -7,10 +7,7 @@ dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 8080;
-const URL = process.env.MONGODB_URL;
-
-// Remove problematic raw body logging middleware
-// This was interfering with normal request processing
+const URL = process.env.MONGODB_URL; // Should be mongodb://localhost:27017/profitloss_db
 
 // Body parser middleware - simplified version
 app.use(bodyParser.json({
@@ -56,27 +53,16 @@ const salaryRoutes = require("./routes/salaryRoutes");
 const pdfRoutes = require('./routes/pdfRoutes');
 const financialTipsRoutes = require('./routes/financialTipsRoutes');
 
-// Use Routes with proper error handling
-const useRoute = (path, router) => {
-    app.use(path, (req, res, next) => {
-        try {
-            router(req, res, next);
-        } catch (err) {
-            console.error(`Route ${path} error:`, err);
-            res.status(500).json({ error: 'Internal route error' });
-        }
-    });
-};
-
-useRoute("/api/bankbook", bankBookRoutes);
-useRoute("/api/balancesheets", balanceSheetRoutes);
-useRoute("/api/Employee", employeeRoutes);
-useRoute("/api/ledger", ledgerRoutes);
-useRoute("/api/pettycash", pettyCashRoutes);
-useRoute("/api/profitloss", profitLossRoutes);
-useRoute("/api/salaries", salaryRoutes);
-useRoute('/api/pdf', pdfRoutes);
-useRoute('/api/financial-tips', financialTipsRoutes);
+// Mount Routes
+app.use("/api/bankbook", bankBookRoutes);
+app.use("/api/balancesheets", balanceSheetRoutes);
+app.use("/api/Employee", employeeRoutes);
+app.use("/api/ledger", ledgerRoutes);
+app.use("/api/pettycash", pettyCashRoutes);
+app.use("/api/profitloss", profitLossRoutes);
+app.use("/api/salaries", salaryRoutes);
+app.use('/api/pdf', pdfRoutes);
+app.use('/api/financial-tips', financialTipsRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
@@ -90,7 +76,7 @@ app.get('/api/health', (req, res) => {
 // Catch-all for 404 errors
 app.use((req, res) => {
     console.log(`404 Not Found: ${req.method} ${req.originalUrl}`);
-    res.status(404).json({ 
+    res.status(404).json({
         error: 'Endpoint not found',
         path: req.originalUrl,
         method: req.method
@@ -100,29 +86,29 @@ app.use((req, res) => {
 // Improved error handling middleware
 app.use((err, req, res, next) => {
     console.error('Error stack:', err.stack);
-    
+
     if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
-        return res.status(400).json({ 
+        return res.status(400).json({
             error: 'Invalid JSON payload',
             details: err.message
         });
     }
-    
+
     if (err.name === 'ValidationError') {
         return res.status(400).json({
             error: 'Validation failed',
             details: err.errors
         });
     }
-    
+
     if (err.name === 'MongoServerError') {
         return res.status(500).json({
             error: 'Database operation failed',
             details: err.message
         });
     }
-    
-    res.status(500).json({ 
+
+    res.status(500).json({
         error: 'Internal server error',
         requestId: req.id,
         timestamp: new Date().toISOString()
@@ -133,7 +119,7 @@ app.use((err, req, res, next) => {
 const startServer = async () => {
     try {
         await connectDB();
-        
+
         const server = app.listen(PORT, () => {
             console.log(`Server is running on port: ${PORT}`);
             console.log(`MongoDB connected: ${mongoose.connection.readyState === 1}`);

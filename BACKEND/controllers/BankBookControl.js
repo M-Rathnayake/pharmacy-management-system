@@ -18,18 +18,27 @@ const validateBankBookEntry = (req, res, next) => {
 
 const addBankBook = async (req, res) => {
   try {
-    const { date, description, voucher_no, deposits = 0, withdrawal = 0 } = req.body;
+    let { date, description, voucher_no, deposits = 0, withdrawal = 0 } = req.body;
 
-    // Auto-calculate balance
-    const balance = Number(deposits) - Number(withdrawal);
+    // Convert date to proper Date object if it's a string
+    if (typeof date === 'string') {
+      date = new Date(date);
+      if (isNaN(date.getTime())) {
+        return res.status(400).json({ error: 'Invalid date format' });
+      }
+    }
+
+    // Convert amounts to numbers
+    deposits = Number(deposits);
+    withdrawal = Number(withdrawal);
 
     const newEntry = await BankBook.create({
       date,
       description,
       voucher_no: voucher_no || null,
       deposits,
-      withdrawal,
-      balance
+      withdrawal
+      // balance will be auto-calculated in pre-save hook
     });
 
     res.status(201).json({
@@ -53,7 +62,8 @@ const addBankBook = async (req, res) => {
     
     res.status(500).json({ 
       error: 'Server error',
-      message: error.message 
+      message: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
 };
@@ -74,10 +84,19 @@ const getBankBooks = async (req, res) => {
 const updateBankBook = async (req, res) => {
   try {
     const { bankbook_id } = req.params;
-    const { date, description, voucher_no, deposits = 0, withdrawal = 0 } = req.body;
+    let { date, description, voucher_no, deposits = 0, withdrawal = 0 } = req.body;
 
-    // Auto-calculate balance
-    const balance = Number(deposits) - Number(withdrawal);
+    // Convert date if needed
+    if (typeof date === 'string') {
+      date = new Date(date);
+      if (isNaN(date.getTime())) {
+        return res.status(400).json({ error: 'Invalid date format' });
+      }
+    }
+
+    // Convert amounts
+    deposits = Number(deposits);
+    withdrawal = Number(withdrawal);
 
     const updatedEntry = await BankBook.findByIdAndUpdate(
       bankbook_id,
@@ -86,8 +105,8 @@ const updateBankBook = async (req, res) => {
         description,
         voucher_no: voucher_no || null,
         deposits,
-        withdrawal,
-        balance
+        withdrawal
+        // balance will be recalculated on save
       },
       { new: true, runValidators: true }
     );
@@ -103,10 +122,11 @@ const updateBankBook = async (req, res) => {
 
   } catch (error) {
     console.error('Update error:', error);
-    
+
     if (error.name === 'CastError') {
       return res.status(400).json({ error: 'Invalid ID format' });
     }
+
     if (error.name === 'ValidationError') {
       const errors = Object.values(error.errors).map(err => ({
         field: err.path,
@@ -117,10 +137,11 @@ const updateBankBook = async (req, res) => {
         details: errors
       });
     }
-    
+
     res.status(500).json({ 
       error: 'Server error',
-      message: error.message 
+      message: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
 };
