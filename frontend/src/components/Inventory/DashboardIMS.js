@@ -16,7 +16,8 @@ import {
   Home,
   Inventory,
   Category,
-  Warning
+  Warning,
+  TrendingUp
 } from '@mui/icons-material';
 import { 
   LineChart, 
@@ -339,10 +340,10 @@ const Dashboard = () => {
               }}
             >
               <ListItemIcon>
-                <Category sx={{ color: 'white' }} />
+                <TrendingUp sx={{ color: 'white' }} />
               </ListItemIcon>
               <ListItemText 
-                primary="Transactions" 
+                primary="Transaction History" 
                 primaryTypographyProps={{
                   fontWeight: location.pathname === '/inventory/transactions' ? 'bold' : 'normal'
                 }}

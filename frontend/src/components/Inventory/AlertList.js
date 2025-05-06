@@ -44,11 +44,13 @@ import {
   Timer as TimerIcon,
   Error as ErrorIcon,
   Search as SearchIcon,
-  DoneAll as DoneAllIcon
+  DoneAll as DoneAllIcon,
+  ArrowBack
 } from '@mui/icons-material';
 import { getAllUnresolvedAlerts, resolveAlert } from "../../services/alertService";
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
+import { useNavigate } from 'react-router-dom';
 
 // Extend dayjs with the relativeTime plugin
 dayjs.extend(relativeTime);
@@ -65,6 +67,7 @@ const AlertList = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetchAlerts();
@@ -215,9 +218,22 @@ const AlertList = () => {
         alignItems: 'center', 
         mb: 3 
       }}>
-        <Typography variant="h4" component="h2" sx={{ color: '#1a5cb3', fontWeight: 'bold' }}>
-          Inventory Alerts
-        </Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          <IconButton 
+            onClick={() => navigate('/inventory')}
+            sx={{ 
+              color: '#1a5cb3',
+              '&:hover': {
+                backgroundColor: '#e6f2ff'
+              }
+            }}
+          >
+            <ArrowBack />
+          </IconButton>
+          <Typography variant="h4" component="h2" sx={{ color: '#1a5cb3', fontWeight: 'bold' }}>
+            Alerts
+          </Typography>
+        </Box>
         
         <Box sx={{ display: 'flex', gap: 2 }}>
           <Button

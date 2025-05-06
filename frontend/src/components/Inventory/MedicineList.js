@@ -181,9 +181,22 @@ const MedicineList = () => {
         alignItems: 'center', 
         mb: 3 
       }}>
-        <Typography variant="h4" component="h2" sx={{ color: darkBlue, fontWeight: 'bold' }}>
-          Stock Management
-        </Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          <IconButton 
+            onClick={() => navigate('/inventory')}
+            sx={{ 
+              color: darkBlue,
+              '&:hover': {
+                backgroundColor: lightBlue
+              }
+            }}
+          >
+            <ArrowBack />
+          </IconButton>
+          <Typography variant="h4" component="h2" sx={{ color: darkBlue, fontWeight: 'bold' }}>
+            Stock Management
+          </Typography>
+        </Box>
         
         <Box sx={{ display: 'flex', gap: 2 }}>
           <Button
