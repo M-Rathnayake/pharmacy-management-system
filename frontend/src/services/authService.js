@@ -1,34 +1,29 @@
-import axios from 'axios';
+import { authenticateUser } from '../data/users';
 
 const API_URL = 'http://localhost:5000/api';
 
 export const login = async (credentials) => {
-  try {
-    const response = await axios.post(`${API_URL}/auth/login`, credentials);
-    if (response.data.token) {
-      localStorage.setItem('token', response.data.token);
-    }
-    return response.data;
-  } catch (error) {
-    throw error.response?.data || error.message;
+  const { username, password } = credentials;
+  const user = authenticateUser(username, password);
+  
+  if (user) {
+    localStorage.setItem('user', JSON.stringify(user));
+    return user;
   }
+  throw new Error('Invalid credentials');
 };
 
 export const logout = async () => {
-  localStorage.removeItem('token');
+  localStorage.removeItem('user');
 };
 
 export const getCurrentUser = async () => {
   try {
-    const token = localStorage.getItem('token');
-    if (!token) return null;
-
-    const response = await axios.get(`${API_URL}/auth/me`, {
-      headers: { Authorization: `Bearer ${token}` }
-    });
-    return response.data;
+    const userData = localStorage.getItem('user');
+    if (!userData) return null;
+    return JSON.parse(userData);
   } catch (error) {
-    localStorage.removeItem('token');
+    localStorage.removeItem('user');
     return null;
   }
 }; 

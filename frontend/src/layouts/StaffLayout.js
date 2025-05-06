@@ -15,7 +15,8 @@ import {
   Container,
   Avatar,
   useTheme,
-  useMediaQuery
+  useMediaQuery,
+  Button
 } from '@mui/material';
 import {
   Menu as MenuIcon,
@@ -27,9 +28,12 @@ import {
   Business as SupplierIcon,
   ExitToApp as LogoutIcon,
   ChevronLeft as ChevronLeftIcon,
-  People as PeopleIcon
+  People as PeopleIcon,
+  Login as LoginIcon
 } from '@mui/icons-material';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
+import LoginDialog from '../components/Auth/LoginDialog';
 
 const drawerWidth = 280;
 
@@ -76,8 +80,10 @@ const StaffLayout = () => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const [drawerOpen, setDrawerOpen] = useState(!isMobile);
+  const [loginDialogOpen, setLoginDialogOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
+  const { user, logout: handleLogout } = useAuth();
 
   const isInventorySection = location.pathname.startsWith('/inventory');
 
@@ -156,29 +162,48 @@ const StaffLayout = () => {
       </Box>
 
       {/* User Profile Section */}
-      <Box sx={{ p: 2, borderTop: 1, borderColor: 'divider' }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
-          <Avatar sx={{ bgcolor: 'primary.main' }}>JD</Avatar>
-          <Box>
-            <Typography variant="subtitle1">John Doe</Typography>
-            <Typography variant="body2" color="text.secondary">
-              Staff Member
-            </Typography>
+      {user ? (
+        <Box sx={{ p: 2 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+            <Avatar sx={{ bgcolor: 'primary.main' }}>
+              {user.name?.charAt(0) || 'U'}
+            </Avatar>
+            <Box>
+              <Typography variant="subtitle1">{user.name}</Typography>
+              <Typography variant="body2" color="text.secondary">
+                {user.role}
+              </Typography>
+            </Box>
           </Box>
+          <ListItemButton
+            onClick={handleLogout}
+            sx={{
+              borderRadius: 1,
+              color: 'error.main',
+            }}
+          >
+            <ListItemIcon sx={{ minWidth: 40, color: 'error.main' }}>
+              <LogoutIcon />
+            </ListItemIcon>
+            <ListItemText primary="Logout" />
+          </ListItemButton>
         </Box>
-        <ListItemButton
-          onClick={() => {/* Handle logout */}}
-          sx={{
-            borderRadius: 1,
-            color: 'error.main',
-          }}
-        >
-          <ListItemIcon sx={{ minWidth: 40, color: 'error.main' }}>
-            <LogoutIcon />
-          </ListItemIcon>
-          <ListItemText primary="Logout" />
-        </ListItemButton>
-      </Box>
+      ) : (
+        <Box sx={{ p: 2 }}>
+          <ListItemButton
+            onClick={() => setLoginDialogOpen(true)}
+            sx={{
+              borderRadius: 1,
+              color: 'primary.main',
+            }}
+          >
+            <ListItemIcon sx={{ minWidth: 40, color: 'primary.main' }}>
+              <LoginIcon />
+            </ListItemIcon>
+            <ListItemText primary="Login" />
+          </ListItemButton>
+        </Box>
+      )}
     </Box>
   );
 
@@ -211,6 +236,16 @@ const StaffLayout = () => {
               <Typography variant="h6" noWrap component="div">
                 {getPageTitle()}
               </Typography>
+              <Box sx={{ flexGrow: 1 }} />
+              {!user && (
+                <Button
+                  color="inherit"
+                  startIcon={<LoginIcon />}
+                  onClick={() => setLoginDialogOpen(true)}
+                >
+                  Login
+                </Button>
+              )}
             </Toolbar>
           </AppBar>
 
@@ -244,6 +279,11 @@ const StaffLayout = () => {
       >
         <Outlet />
       </Box>
+
+      <LoginDialog
+        open={loginDialogOpen}
+        onClose={() => setLoginDialogOpen(false)}
+      />
     </Box>
   );
 };

@@ -3,49 +3,62 @@ import { login as apiLogin, logout as apiLogout, getCurrentUser } from '../servi
 
 const AuthContext = createContext(null);
 
+// Simple role definitions
+const ROLES = {
+  ADMIN: 'admin',
+  PHARMACIST: 'pharmacist',
+  CASHIER: 'cashier'
+};
+
+// Simple permission mapping
+const ROLE_PERMISSIONS = {
+  [ROLES.ADMIN]: ['inventory', 'orders', 'suppliers', 'customers', 'finance'],
+  [ROLES.PHARMACIST]: ['inventory', 'orders', 'customers'],
+  [ROLES.CASHIER]: ['orders', 'customers']
+};
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    checkAuth();
+    const initializeAuth = async () => {
+      try {
+        const userData = await getCurrentUser();
+        setUser(userData);
+      } catch (error) {
+        setUser(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    initializeAuth();
   }, []);
 
-  const checkAuth = async () => {
+  const login = async (credentials) => {
     try {
-      const userData = await getCurrentUser();
+      const userData = await apiLogin(credentials);
       setUser(userData);
+      return userData;
     } catch (error) {
-      setUser(null);
-    } finally {
-      setLoading(false);
+      throw error;
     }
   };
 
-  const login = async (credentials) => {
-    const userData = await apiLogin(credentials);
-    setUser(userData);
-    return userData;
-  };
-
   const logout = async () => {
-    await apiLogout();
-    setUser(null);
+    try {
+      await apiLogout();
+      setUser(null);
+    } catch (error) {
+      console.error('Logout failed:', error);
+    }
   };
 
+  // Simple permission check
   const hasPermission = (permission) => {
-    if (!user) return false;
-    
-    // Admin has all permissions
-    if (user.role === 'admin') return true;
-
-    // Role-based permissions
-    const rolePermissions = {
-      staff: ['view_inventory', 'manage_inventory', 'view_transactions'],
-      customer: ['view_products', 'place_orders', 'view_orders']
-    };
-
-    return rolePermissions[user.role]?.includes(permission) || false;
+    if (!user || !user.role) return false;
+    return ROLE_PERMISSIONS[user.role]?.includes(permission) || false;
   };
 
   const value = {
@@ -53,7 +66,8 @@ export const AuthProvider = ({ children }) => {
     loading,
     login,
     logout,
-    hasPermission
+    hasPermission,
+    ROLES
   };
 
   return (

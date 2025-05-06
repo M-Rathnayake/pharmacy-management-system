@@ -1,7 +1,9 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { ThemeProvider, createTheme } from '@mui/material';
+import { AuthProvider } from './contexts/AuthContext';
 import StaffLayout from './layouts/StaffLayout';
+import ProtectedRoute from './components/Auth/ProtectedRoute';
 
 // Staff Dashboard
 import StaffDashboard from './components/Staff/StaffDashboard';
@@ -14,10 +16,11 @@ import EditMedicine from './components/Inventory/EditMedicine';
 import AlertList from './components/Inventory/AlertList';
 import TransactionLogs from './components/Inventory/TransactionLogs';
 
-// Placeholder components for other management systems
-const OrderManagement = () => <div>Order Management System (Coming Soon)</div>;
-const SupplierManagement = () => <div>Supplier Management System (Coming Soon)</div>;
-const FinancialManagement = () => <div>Financial Management System (Coming Soon)</div>;
+// Other Management Systems - Import or use placeholders
+const OrderManagement = () => <div>Order Management System</div>;
+const SupplierManagement = () => <div>Supplier Management System</div>;
+const FinancialManagement = () => <div>Financial Management System</div>;
+const CustomerManagement = () => <div>Customer Management System</div>;
 
 const theme = createTheme({
   palette: {
@@ -33,29 +36,79 @@ const theme = createTheme({
 function App() {
   return (
     <ThemeProvider theme={theme}>
-      <Router>
-        <Routes>
-          <Route path="/" element={<StaffLayout />}>
-            {/* Staff Dashboard as main landing page */}
-            <Route index element={<StaffDashboard />} />
+      <AuthProvider>
+        <Router>
+          <Routes>
+            {/* Protected Routes */}
+            <Route path="/" element={<StaffLayout />}>
+              {/* Staff Dashboard as main landing page */}
+              <Route index element={<StaffDashboard />} />
 
-            {/* Inventory Management */}
-            <Route path="inventory">
-              <Route index element={<DashboardIMS />} />
-              <Route path="medicines" element={<MedicineList />} />
-              <Route path="medicines/edit/:id" element={<EditMedicine />} />
-              <Route path="add" element={<AddMedicine />} />
-              <Route path="alerts" element={<AlertList />} />
-              <Route path="transactions" element={<TransactionLogs />} />
+              {/* Inventory Management */}
+              <Route path="inventory">
+                <Route index element={
+                  <ProtectedRoute requiredPermission="inventory">
+                    <DashboardIMS />
+                  </ProtectedRoute>
+                } />
+                <Route path="medicines" element={
+                  <ProtectedRoute requiredPermission="inventory">
+                    <MedicineList />
+                  </ProtectedRoute>
+                } />
+                <Route path="medicines/edit/:id" element={
+                  <ProtectedRoute requiredPermission="inventory">
+                    <EditMedicine />
+                  </ProtectedRoute>
+                } />
+                <Route path="add" element={
+                  <ProtectedRoute requiredPermission="inventory">
+                    <AddMedicine />
+                  </ProtectedRoute>
+                } />
+                <Route path="alerts" element={
+                  <ProtectedRoute requiredPermission="inventory">
+                    <AlertList />
+                  </ProtectedRoute>
+                } />
+                <Route path="transactions" element={
+                  <ProtectedRoute requiredPermission="inventory">
+                    <TransactionLogs />
+                  </ProtectedRoute>
+                } />
+              </Route>
+
+              {/* Order Management */}
+              <Route path="orders/*" element={
+                <ProtectedRoute requiredPermission="orders">
+                  <OrderManagement />
+                </ProtectedRoute>
+              } />
+
+              {/* Supplier Management */}
+              <Route path="suppliers/*" element={
+                <ProtectedRoute requiredPermission="suppliers">
+                  <SupplierManagement />
+                </ProtectedRoute>
+              } />
+
+              {/* Financial Management */}
+              <Route path="finance/*" element={
+                <ProtectedRoute requiredPermission="finance">
+                  <FinancialManagement />
+                </ProtectedRoute>
+              } />
+
+              {/* Customer Management */}
+              <Route path="customers/*" element={
+                <ProtectedRoute requiredPermission="customers">
+                  <CustomerManagement />
+                </ProtectedRoute>
+              } />
             </Route>
-
-            {/* Other Management Systems */}
-            <Route path="orders/*" element={<OrderManagement />} />
-            <Route path="suppliers/*" element={<SupplierManagement />} />
-            <Route path="finance/*" element={<FinancialManagement />} />
-          </Route>
-        </Routes>
-      </Router>
+          </Routes>
+        </Router>
+      </AuthProvider>
     </ThemeProvider>
   );
 }
