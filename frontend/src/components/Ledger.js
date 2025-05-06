@@ -25,8 +25,12 @@ import {
   Snackbar,
   Avatar,
   Chip,
-  Divider,
-  CircularProgress
+  Select,
+  MenuItem,
+  InputLabel,
+  CircularProgress,
+  Switch,
+  FormGroup
 } from "@mui/material";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
@@ -36,11 +40,20 @@ import AccountBalanceIcon from "@mui/icons-material/AccountBalance";
 import DownloadPDFButton from "./DownloadPDFButton";
 
 const LedgerForm = () => {
-  const [accountName, setAccountName] = useState("");
-  const [transactionType, setTransactionType] = useState("debit");
-  const [description, setDescription] = useState("");
-  const [date, setDate] = useState("");
-  const [amount, setAmount] = useState("");
+  const [formData, setFormData] = useState({
+    accountName: "",
+    accountCode: "",
+    accountType: "",
+    subAccountType: "",
+    openingBalance: 0,
+    balanceType: "debit",
+    isActive: true,
+    taxApplicable: false,
+    taxRate: 0,
+    reconciliationFrequency: "monthly",
+    notes: ""
+  });
+
   const [ledgerData, setLedgerData] = useState([]);
   const [errors, setErrors] = useState({});
   const [alertMsg, setAlertMsg] = useState({ open: false, message: "", severity: "error" });
@@ -48,6 +61,11 @@ const LedgerForm = () => {
   const [editingId, setEditingId] = useState(null);
   const [expandedAccounts, setExpandedAccounts] = useState({});
   const [isLoading, setIsLoading] = useState(false);
+
+  // Account types and sub-types
+  const accountTypes = ['asset', 'liability', 'equity', 'revenue', 'expense'];
+  const subAccountTypes = ['current', 'non-current'];
+  const reconciliationFrequencies = ['daily', 'weekly', 'monthly', 'quarterly', 'annually', 'never'];
 
   useEffect(() => {
     fetchLedgerData();
@@ -60,9 +78,7 @@ const LedgerForm = () => {
       setLedgerData(response.data);
       const initialExpanded = {};
       response.data.forEach(item => {
-        if (!initialExpanded[item.account_name]) {
-          initialExpanded[item.account_name] = true;
-        }
+        initialExpanded[item._id] = false;
       });
       setExpandedAccounts(initialExpanded);
     } catch (error) {
@@ -78,13 +94,47 @@ const LedgerForm = () => {
     setTimeout(() => setAlertMsg({ ...alertMsg, open: false }), 6000);
   };
 
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+
+    // Clear error when user starts typing
+    if (errors[name]) {
+      setErrors(prev => ({
+        ...prev,
+        [name]: ""
+      }));
+    }
+  };
+
+  const handleSwitchChange = (e) => {
+    const { name, checked } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: checked
+    }));
+  };
+
   const validateForm = () => {
     let formErrors = {};
-    if (!accountName.trim()) formErrors.accountName = "Account Name is required";
-    if (!transactionType) formErrors.transactionType = "Transaction Type is required";
-    if (!description.trim()) formErrors.description = "Description is required";
-    if (!date) formErrors.date = "Date is required";
-    if (!amount || Number(amount) <= 0) formErrors.amount = "Valid amount is required";
+    
+    if (!formData.accountName) formErrors.accountName = "Account name is required";
+    if (!formData.accountCode) formErrors.accountCode = "Account code is required";
+    if (!formData.accountType) formErrors.accountType = "Account type is required";
+    
+    // Conditional validation for sub-account type
+    if ((formData.accountType === 'asset' || formData.accountType === 'liability') && !formData.subAccountType) {
+      formErrors.subAccountType = "Sub-account type is required for assets and liabilities";
+    }
+    
+    // Conditional validation for tax rate
+    if (formData.taxApplicable && (!formData.taxRate || formData.taxRate <= 0)) {
+      formErrors.taxRate = "Tax rate must be greater than 0 when tax is applicable";
+    }
+
     setErrors(formErrors);
     return Object.keys(formErrors).length === 0;
   };
@@ -99,30 +149,14 @@ const LedgerForm = () => {
       return;
     }
 
-    const newData = {
-      account_name: accountName,
-      transaction_type: transactionType,
-      description,
-      date: new Date(date).toISOString(), // Convert to ISO format
-      amount: Number(amount),
-    };
-
     try {
       let response;
       if (!isEditing) {
-        response = await axios.post("http://localhost:8080/api/ledger", newData, {
-          headers: {
-            'Content-Type': 'application/json'
-          }
-        });
-        showAlert("Entry added successfully", "success");
+        response = await axios.post("http://localhost:8080/api/ledger", formData);
+        showAlert("Ledger account created successfully", "success");
       } else {
-        response = await axios.put(`http://localhost:8080/api/ledger/${editingId}`, newData, {
-          headers: {
-            'Content-Type': 'application/json'
-          }
-        });
-        showAlert("Entry updated successfully", "success");
+        response = await axios.put(`http://localhost:8080/api/ledger/${editingId}`, formData);
+        showAlert("Ledger account updated successfully", "success");
         setIsEditing(false);
         setEditingId(null);
       }
@@ -130,16 +164,7 @@ const LedgerForm = () => {
       resetForm();
       await fetchLedgerData();
     } catch (error) {
-      console.error("Detailed error:", {
-        message: error.message,
-        response: error.response?.data,
-        request: error.request,
-        config: error.config
-      });
-      
-      const errorMessage = error.response?.data?.message || 
-                         error.response?.data?.error || 
-                         "Error submitting data. Please try again.";
+      const errorMessage = error.response?.data?.error || "Error submitting data. Please try again.";
       showAlert(errorMessage, "error");
     } finally {
       setIsLoading(false);
@@ -149,11 +174,19 @@ const LedgerForm = () => {
   const handleEdit = (id) => {
     const data = ledgerData.find((item) => item._id === id);
     if (data) {
-      setAccountName(data.account_name);
-      setTransactionType(data.transaction_type);
-      setDescription(data.description);
-      setDate(data.date.split('T')[0]);
-      setAmount(data.amount.toString());
+      setFormData({
+        accountName: data.accountName,
+        accountCode: data.accountCode,
+        accountType: data.accountType,
+        subAccountType: data.subAccountType || "",
+        openingBalance: data.openingBalance,
+        balanceType: data.balanceType,
+        isActive: data.isActive,
+        taxApplicable: data.taxApplicable,
+        taxRate: data.taxRate || 0,
+        reconciliationFrequency: data.reconciliationFrequency,
+        notes: data.notes || ""
+      });
       setEditingId(id);
       setIsEditing(true);
     }
@@ -163,100 +196,52 @@ const LedgerForm = () => {
     try {
       setIsLoading(true);
       await axios.delete(`http://localhost:8080/api/ledger/${id}`);
-      showAlert("Entry deleted successfully", "success");
+      showAlert("Ledger account deleted successfully", "success");
       await fetchLedgerData();
     } catch (error) {
-      console.error("Error deleting data:", error);
-      showAlert(error.response?.data?.message || "Error deleting data. Please try again.", "error");
+      const errorMessage = error.response?.data?.error || "Error deleting ledger account";
+      showAlert(errorMessage, "error");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const toggleStatus = async (id) => {
+    try {
+      setIsLoading(true);
+      await axios.patch(`http://localhost:8080/api/ledger/${id}/toggle-status`);
+      showAlert("Ledger account status updated successfully", "success");
+      await fetchLedgerData();
+    } catch (error) {
+      const errorMessage = error.response?.data?.error || "Error updating ledger status";
+      showAlert(errorMessage, "error");
     } finally {
       setIsLoading(false);
     }
   };
 
   const resetForm = () => {
-    setAccountName("");
-    setTransactionType("debit");
-    setDescription("");
-    setDate("");
-    setAmount("");
+    setFormData({
+      accountName: "",
+      accountCode: "",
+      accountType: "",
+      subAccountType: "",
+      openingBalance: 0,
+      balanceType: "debit",
+      isActive: true,
+      taxApplicable: false,
+      taxRate: 0,
+      reconciliationFrequency: "monthly",
+      notes: ""
+    });
     setErrors({});
   };
 
-  const toggleAccountExpand = (accountName) => {
+  const toggleAccountExpand = (id) => {
     setExpandedAccounts(prev => ({
       ...prev,
-      [accountName]: !prev[accountName]
+      [id]: !prev[id]
     }));
-  };
-
-  const groupedData = ledgerData.reduce((acc, item) => {
-    if (!acc[item.account_name]) {
-      acc[item.account_name] = [];
-    }
-    acc[item.account_name].push(item);
-    return acc;
-  }, {});
-
-  const AccountHeader = ({ accountName, expanded, onClick }) => {
-    const totalDebits = groupedData[accountName]
-      ?.filter(t => t.transaction_type === 'debit')
-      ?.reduce((sum, t) => sum + t.amount, 0) || 0;
-    
-    const totalCredits = groupedData[accountName]
-      ?.filter(t => t.transaction_type === 'credit')
-      ?.reduce((sum, t) => sum + t.amount, 0) || 0;
-    
-    const balance = totalDebits - totalCredits;
-
-    return (
-      <Box 
-        sx={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          backgroundColor: '#f8f9fa',
-          p: 2,
-          borderRadius: 1,
-          cursor: 'pointer',
-          boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-          transition: 'all 0.3s ease',
-          '&:hover': {
-            backgroundColor: '#e9ecef',
-            transform: 'translateY(-2px)'
-          },
-          mb: 1
-        }}
-        onClick={onClick}
-      >
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-          <Avatar sx={{ bgcolor: '#3998ff' }}>
-            <AccountBalanceIcon />
-          </Avatar>
-          <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
-            {accountName}
-          </Typography>
-        </Box>
-        
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-          <Chip 
-            label={`Debit: ₹${totalDebits.toFixed(2)}`} 
-            color="error" 
-            variant="outlined"
-          />
-          <Chip 
-            label={`Credit: ₹${totalCredits.toFixed(2)}`} 
-            color="success" 
-            variant="outlined"
-          />
-          <Chip 
-            label={`Balance: ₹${balance.toFixed(2)}`} 
-            color={balance >= 0 ? 'primary' : 'error'}
-            sx={{ fontWeight: 'bold' }}
-          />
-          {expanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
-        </Box>
-      </Box>
-    );
   };
 
   return (
@@ -270,10 +255,10 @@ const LedgerForm = () => {
         boxShadow: 3
       }}>
         <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
-          Ledger Accounts
+          Ledger Accounts Management
         </Typography>
         <Typography variant="subtitle1">
-          Track all financial transactions by account
+          Manage your chart of accounts
         </Typography>
       </Box>
       
@@ -306,7 +291,7 @@ const LedgerForm = () => {
           alignItems: 'center',
           gap: 1
         }}>
-          {isEditing ? "✏️ Edit Entry" : "➕ Add New Entry"}
+          {isEditing ? "✏️ Edit Account" : "➕ Add New Account"}
         </Typography>
         
         <Grid container spacing={3} component="form" onSubmit={handleSubmit}>
@@ -314,22 +299,102 @@ const LedgerForm = () => {
             <TextField
               fullWidth
               label="Account Name"
-              value={accountName}
-              onChange={(e) => setAccountName(e.target.value)}
+              name="accountName"
+              value={formData.accountName}
+              onChange={handleInputChange}
               error={Boolean(errors.accountName)}
               helperText={errors.accountName}
               required
               disabled={isLoading}
             />
           </Grid>
-          
+
+          <Grid item xs={12} md={6}>
+            <TextField
+              fullWidth
+              label="Account Code"
+              name="accountCode"
+              value={formData.accountCode}
+              onChange={handleInputChange}
+              error={Boolean(errors.accountCode)}
+              helperText={errors.accountCode}
+              required
+              disabled={isLoading || isEditing} // Disable editing of account code
+              inputProps={{
+                pattern: "^[A-Z0-9-]+$",
+                title: "Uppercase letters, numbers and hyphens only"
+              }}
+            />
+          </Grid>
+
+          <Grid item xs={12} md={6}>
+            <FormControl fullWidth error={Boolean(errors.accountType)}>
+              <InputLabel>Account Type *</InputLabel>
+              <Select
+                name="accountType"
+                value={formData.accountType}
+                onChange={handleInputChange}
+                label="Account Type *"
+                required
+                disabled={isLoading}
+              >
+                {accountTypes.map(type => (
+                  <MenuItem key={type} value={type}>
+                    {type.charAt(0).toUpperCase() + type.slice(1)}
+                  </MenuItem>
+                ))}
+              </Select>
+              {errors.accountType && (
+                <Typography color="error" variant="caption">{errors.accountType}</Typography>
+              )}
+            </FormControl>
+          </Grid>
+
+          <Grid item xs={12} md={6}>
+            <FormControl fullWidth error={Boolean(errors.subAccountType)}>
+              <InputLabel>Sub-Account Type</InputLabel>
+              <Select
+                name="subAccountType"
+                value={formData.subAccountType}
+                onChange={handleInputChange}
+                label="Sub-Account Type"
+                disabled={isLoading || !['asset', 'liability'].includes(formData.accountType)}
+              >
+                {subAccountTypes.map(type => (
+                  <MenuItem key={type} value={type}>
+                    {type.charAt(0).toUpperCase() + type.slice(1)}
+                  </MenuItem>
+                ))}
+              </Select>
+              {errors.subAccountType && (
+                <Typography color="error" variant="caption">{errors.subAccountType}</Typography>
+              )}
+            </FormControl>
+          </Grid>
+
+          <Grid item xs={12} md={6}>
+            <TextField
+              fullWidth
+              label="Opening Balance"
+              name="openingBalance"
+              type="number"
+              value={formData.openingBalance}
+              onChange={handleInputChange}
+              inputProps={{ min: 0, step: 0.01 }}
+              error={Boolean(errors.openingBalance)}
+              helperText={errors.openingBalance}
+              disabled={isLoading}
+            />
+          </Grid>
+
           <Grid item xs={12} md={6}>
             <FormControl component="fieldset">
-              <FormLabel component="legend">Transaction Type</FormLabel>
+              <FormLabel component="legend">Balance Type *</FormLabel>
               <RadioGroup
                 row
-                value={transactionType}
-                onChange={(e) => setTransactionType(e.target.value)}
+                name="balanceType"
+                value={formData.balanceType}
+                onChange={handleInputChange}
               >
                 <FormControlLabel 
                   value="debit" 
@@ -344,55 +409,74 @@ const LedgerForm = () => {
                   disabled={isLoading}
                 />
               </RadioGroup>
-              {errors.transactionType && (
-                <Typography color="error" variant="caption">{errors.transactionType}</Typography>
-              )}
             </FormControl>
           </Grid>
-          
+
+          <Grid item xs={12} md={6}>
+            <FormControl fullWidth>
+              <InputLabel>Reconciliation Frequency</InputLabel>
+              <Select
+                name="reconciliationFrequency"
+                value={formData.reconciliationFrequency}
+                onChange={handleInputChange}
+                label="Reconciliation Frequency"
+                disabled={isLoading}
+              >
+                {reconciliationFrequencies.map(freq => (
+                  <MenuItem key={freq} value={freq}>
+                    {freq.charAt(0).toUpperCase() + freq.slice(1)}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Grid>
+
+          <Grid item xs={12} md={6}>
+            <FormGroup>
+              <FormControlLabel
+                control={
+                  <Switch
+                    name="taxApplicable"
+                    checked={formData.taxApplicable}
+                    onChange={handleSwitchChange}
+                    color="primary"
+                  />
+                }
+                label="Tax Applicable"
+              />
+            </FormGroup>
+          </Grid>
+
+          {formData.taxApplicable && (
+            <Grid item xs={12} md={6}>
+              <TextField
+                fullWidth
+                label="Tax Rate (%)"
+                name="taxRate"
+                type="number"
+                value={formData.taxRate}
+                onChange={handleInputChange}
+                inputProps={{ min: 0, max: 100, step: 0.01 }}
+                error={Boolean(errors.taxRate)}
+                helperText={errors.taxRate}
+                disabled={isLoading || !formData.taxApplicable}
+              />
+            </Grid>
+          )}
+
           <Grid item xs={12}>
             <TextField
               fullWidth
-              label="Description"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              error={Boolean(errors.description)}
-              helperText={errors.description}
-              required
+              label="Notes"
+              name="notes"
+              value={formData.notes}
+              onChange={handleInputChange}
+              multiline
+              rows={3}
               disabled={isLoading}
             />
           </Grid>
-          
-          <Grid item xs={12} md={6}>
-            <TextField
-              fullWidth
-              label="Date"
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              InputLabelProps={{ shrink: true }}
-              error={Boolean(errors.date)}
-              helperText={errors.date}
-              required
-              disabled={isLoading}
-            />
-          </Grid>
-          
-          <Grid item xs={12} md={6}>
-            <TextField
-              fullWidth
-              label="Amount"
-              type="number"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              inputProps={{ min: 0.01, step: 0.01 }}
-              error={Boolean(errors.amount)}
-              helperText={errors.amount}
-              required
-              disabled={isLoading}
-            />
-          </Grid>
-          
+
           <Grid item xs={12}>
             <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
               <Button 
@@ -402,7 +486,7 @@ const LedgerForm = () => {
                 disabled={isLoading}
                 startIcon={isLoading ? <CircularProgress size={20} color="inherit" /> : null}
               >
-                {isLoading ? "Processing..." : (isEditing ? "Update" : "Add")}
+                {isLoading ? "Processing..." : (isEditing ? "Update Account" : "Add Account")}
               </Button>
               {isEditing && (
                 <Button 
@@ -439,92 +523,152 @@ const LedgerForm = () => {
             alignItems: 'center',
             gap: 1
           }}>
-            📊 Ledger Entries
+            📊 Ledger Accounts
           </Typography>
           
-          {Object.keys(groupedData).length > 0 ? (
-            Object.keys(groupedData).map((accountName) => (
-              <Box key={accountName} sx={{ mb: 4 }}>
-                <AccountHeader 
-                  accountName={accountName}
-                  expanded={expandedAccounts[accountName]}
-                  onClick={() => toggleAccountExpand(accountName)}
-                />
-                
-                <Collapse in={expandedAccounts[accountName]}>
-                  <TableContainer component={Paper} sx={{ mt: 1 }}>
-                    <Table size="small" sx={{ minWidth: 650 }}>
-                      <TableHead sx={{ backgroundColor: '#f5f5f5' }}>
-                        <TableRow>
-                          <TableCell sx={{ fontWeight: 'bold' }}>Date</TableCell>
-                          <TableCell sx={{ fontWeight: 'bold' }}>Description</TableCell>
-                          <TableCell sx={{ fontWeight: 'bold' }}>Type</TableCell>
-                          <TableCell sx={{ fontWeight: 'bold' }}>Amount (₹)</TableCell>
-                          <TableCell sx={{ fontWeight: 'bold' }}>Actions</TableCell>
-                        </TableRow>
-                      </TableHead>
-                      <TableBody>
-                        {groupedData[accountName].map((row) => (
-                          <TableRow 
-                            key={row._id}
-                            sx={{ 
-                              '&:nth-of-type(odd)': { backgroundColor: '#fafafa' },
-                              '&:hover': { backgroundColor: '#f1f1f1' }
+          {ledgerData.length > 0 ? (
+            <TableContainer component={Paper}>
+              <Table>
+                <TableHead sx={{ backgroundColor: '#f5f5f5' }}>
+                  <TableRow>
+                    <TableCell sx={{ fontWeight: 'bold' }}>Account Code</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold' }}>Account Name</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold' }}>Type</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold' }}>Balance Type</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold' }}>Balance</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold' }}>Status</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold' }}>Actions</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {ledgerData.map((account) => (
+                    <React.Fragment key={account._id}>
+                      <TableRow 
+                        hover
+                        sx={{ '&:hover': { cursor: 'pointer' } }}
+                        onClick={() => toggleAccountExpand(account._id)}
+                      >
+                        <TableCell>{account.accountCode}</TableCell>
+                        <TableCell sx={{ fontWeight: 'medium' }}>{account.accountName}</TableCell>
+                        <TableCell>
+                          <Chip 
+                            label={account.accountType.toUpperCase()}
+                            color={
+                              account.accountType === 'asset' ? 'primary' : 
+                              account.accountType === 'liability' ? 'secondary' : 
+                              account.accountType === 'equity' ? 'success' : 'default'
+                            }
+                            size="small"
+                          />
+                          {account.subAccountType && (
+                            <Chip 
+                              label={account.subAccountType.toUpperCase()}
+                              variant="outlined"
+                              size="small"
+                              sx={{ ml: 1 }}
+                            />
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <Chip 
+                            label={account.balanceType.toUpperCase()}
+                            color={account.balanceType === 'debit' ? 'error' : 'success'}
+                            size="small"
+                          />
+                        </TableCell>
+                        <TableCell sx={{ fontWeight: 'bold' }}>
+                          {account.openingBalance.toFixed(2)}
+                        </TableCell>
+                        <TableCell>
+                          <Chip 
+                            label={account.isActive ? 'Active' : 'Inactive'}
+                            color={account.isActive ? 'success' : 'error'}
+                            size="small"
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <IconButton 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleEdit(account._id);
                             }}
+                            color="primary"
+                            sx={{ '&:hover': { backgroundColor: '#e3f2fd' } }}
+                            disabled={isLoading}
                           >
-                            <TableCell>
-                              {new Date(row.date).toLocaleDateString('en-IN', {
-                                day: '2-digit',
-                                month: 'short',
-                                year: 'numeric'
-                              })}
-                            </TableCell>
-                            <TableCell>{row.description}</TableCell>
-                            <TableCell>
-                              <Chip 
-                                label={row.transaction_type.toUpperCase()}
-                                color={row.transaction_type === 'debit' ? 'error' : 'success'}
-                                size="small"
-                              />
-                            </TableCell>
-                            <TableCell sx={{ fontWeight: 'bold' }}>
-                              ₹{row.amount.toFixed(2)}
-                            </TableCell>
-                            <TableCell>
-                              <IconButton 
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleEdit(row._id);
-                                }}
-                                color="primary"
-                                sx={{ '&:hover': { backgroundColor: '#e3f2fd' } }}
-                                disabled={isLoading}
-                              >
-                                <EditIcon />
-                              </IconButton>
-                              <IconButton 
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleDelete(row._id);
-                                }}
-                                color="error"
-                                sx={{ '&:hover': { backgroundColor: '#ffebee' } }}
-                                disabled={isLoading}
-                              >
-                                <DeleteIcon />
-                              </IconButton>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </TableContainer>
-                </Collapse>
-              </Box>
-            ))
+                            <EditIcon />
+                          </IconButton>
+                          <IconButton 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleStatus(account._id);
+                            }}
+                            color={account.isActive ? 'warning' : 'success'}
+                            sx={{ '&:hover': { backgroundColor: '#fff8e1' } }}
+                            disabled={isLoading}
+                          >
+                            {account.isActive ? '🚫' : '✅'}
+                          </IconButton>
+                          <IconButton 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDelete(account._id);
+                            }}
+                            color="error"
+                            sx={{ '&:hover': { backgroundColor: '#ffebee' } }}
+                            disabled={isLoading}
+                          >
+                            <DeleteIcon />
+                          </IconButton>
+                        </TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell style={{ padding: 0 }} colSpan={7}>
+                          <Collapse in={expandedAccounts[account._id]}>
+                            <Box sx={{ p: 3, backgroundColor: '#fafafa' }}>
+                              <Grid container spacing={3}>
+                                <Grid item xs={12} md={6}>
+                                  <Typography variant="subtitle1" gutterBottom>
+                                    <strong>Account Details</strong>
+                                  </Typography>
+                                  {account.taxApplicable && (
+                                    <Typography>
+                                      <strong>Tax Rate:</strong> {account.taxRate}%
+                                    </Typography>
+                                  )}
+                                  <Typography>
+                                    <strong>Reconciliation:</strong> {account.reconciliationFrequency}
+                                  </Typography>
+                                </Grid>
+                                <Grid item xs={12} md={6}>
+                                  <Typography variant="subtitle1" gutterBottom>
+                                    <strong>Additional Information</strong>
+                                  </Typography>
+                                  <Typography>
+                                    <strong>Created:</strong> {new Date(account.createdAt).toLocaleString()}
+                                  </Typography>
+                                  <Typography>
+                                    <strong>Last Updated:</strong> {new Date(account.updatedAt).toLocaleString()}
+                                  </Typography>
+                                  {account.notes && (
+                                    <Typography>
+                                      <strong>Notes:</strong> {account.notes}
+                                    </Typography>
+                                  )}
+                                </Grid>
+                              </Grid>
+                            </Box>
+                          </Collapse>
+                        </TableCell>
+                      </TableRow>
+                    </React.Fragment>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
           ) : (
             <Typography variant="body1" sx={{ textAlign: 'center', py: 4, color: 'text.secondary' }}>
-              No ledger entries found. Add your first entry above.
+              No ledger accounts found. Add your first account above.
             </Typography>
           )}
         </Paper>
@@ -535,7 +679,7 @@ const LedgerForm = () => {
           <DownloadPDFButton 
             documentType="ledger" 
             data={ledgerData} 
-            fileName="ledger_report.pdf"
+            fileName="ledger_accounts.pdf"
             sx={{
               backgroundColor: '#3998ff',
               color: 'white',

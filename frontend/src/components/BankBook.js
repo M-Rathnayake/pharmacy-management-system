@@ -568,16 +568,36 @@ const BankBookForm = () => {
         </TableContainer>
       </Paper>
 
-      {/* Download/View PDF Buttons */}
-      <Paper elevation={3} sx={{ p: 2, borderRadius: 2 }}>
-        <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
-          <DownloadBankBookPDFButton
-            documentType="Bank Book"
-            data={bankBookData}
-            fileName="bank_book_report"
-          />
-        </Box>
-      </Paper>
+      {/* PDF Export Section */}
+      {bankBookData.length > 0 && (
+        <Paper elevation={3} sx={{ p: 3, mt: 4, borderRadius: 2 }}>
+          <Typography
+            variant="h6"
+            sx={{
+              color: '#3998ff',
+              fontWeight: 'bold',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1,
+              mb: 2,
+            }}
+          >
+            🖨️ Export Bank Book
+          </Typography>
+          <Box sx={{ display: 'flex', justifyContent: 'flex-start' }}>
+            <DownloadBankBookPDFButton
+              documentType="Bank Book"
+              data={bankBookData}
+              fileName="bank_book.pdf"
+              sx={{
+                backgroundColor: '#3998ff',
+                color: 'white',
+                '&:hover': { backgroundColor: '#2979ff' },
+              }}
+            />
+          </Box>
+        </Paper>
+      )}
     </Container>
   );
 };

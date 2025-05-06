@@ -41,6 +41,7 @@ import {
   Balance
 } from "@mui/icons-material";
 import { format } from 'date-fns';
+import DownloadPDFButton from "./DownloadPDFButton";
 
 const BalanceSheetForm = () => {
   const [formData, setFormData] = useState({
@@ -106,7 +107,7 @@ const BalanceSheetForm = () => {
 
   const fetchBalanceData = useCallback(async () => {
     try {
-      const response = await axios.get("http://localhost:8080/api/balancesheet");
+      const response = await axios.get("http://localhost:8080/api/balancesheets");
       setBalanceData(response.data);
     } catch (error) {
       showAlert(error.response?.data?.message || "Error fetching data", "error");
@@ -144,11 +145,29 @@ const BalanceSheetForm = () => {
     if (!formData.period) newErrors.period = "Period is required";
     if (!formData.period_date) newErrors.period_date = "Date is required";
     
-    // Validate accounting equation
+    // Calculate totals first
     const totalAssets = calculateTotalAssets();
     const totalLiabilities = calculateTotalLiabilities();
     const totalEquity = calculateTotalEquity();
     
+    // Update formData with calculated totals
+    const updatedFormData = {
+      ...formData,
+      assets: {
+        ...formData.assets,
+        total_assets: totalAssets
+      },
+      liabilities: {
+        ...formData.liabilities,
+        total_liabilities: totalLiabilities
+      },
+      equity: {
+        ...formData.equity,
+        total_equity: totalEquity
+      }
+    };
+    
+    // Validate accounting equation
     if (Math.abs(totalAssets - (totalLiabilities + totalEquity)) > 0.01) {
       newErrors.balance = "Assets must equal Liabilities + Equity";
     }
@@ -175,53 +194,116 @@ const BalanceSheetForm = () => {
     return Object.values(formData.equity).reduce((sum, val) => sum + Number(val), 0);
   };
 
+  const handleEdit = (id) => {
+    const entry = balanceData.find(item => item._id === id);
+    if (!entry) {
+      showAlert("Entry not found", "error");
+      return;
+    }
+
+    // Format the date to YYYY-MM-DD
+    const formattedEntry = {
+      ...entry,
+      period_date: format(new Date(entry.period_date), 'yyyy-MM-dd')
+    };
+
+    setFormData(formattedEntry);
+    setEditingId(id);
+    setIsEditing(true);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!validateForm()) return;
+    
+    // Calculate totals first
+    const totalAssets = calculateTotalAssets();
+    const totalLiabilities = calculateTotalLiabilities();
+    const totalEquity = calculateTotalEquity();
 
+    // Prepare the payload with all required fields
     const payload = {
-      ...formData,
+      period: formData.period,
+      period_date: formData.period_date,
       assets: {
-        ...formData.assets,
-        total_assets: calculateTotalAssets()
+        current_assets: {
+          cash: Number(formData.assets.current_assets.cash) || 0,
+          bank_balance: Number(formData.assets.current_assets.bank_balance) || 0,
+          accounts_receivable: Number(formData.assets.current_assets.accounts_receivable) || 0,
+          inventory: Number(formData.assets.current_assets.inventory) || 0,
+          prepaid_expenses: Number(formData.assets.current_assets.prepaid_expenses) || 0,
+          other_current_assets: Number(formData.assets.current_assets.other_current_assets) || 0
+        },
+        fixed_assets: {
+          property: Number(formData.assets.fixed_assets.property) || 0,
+          equipment: Number(formData.assets.fixed_assets.equipment) || 0,
+          vehicles: Number(formData.assets.fixed_assets.vehicles) || 0,
+          accumulated_depreciation: Number(formData.assets.fixed_assets.accumulated_depreciation) || 0
+        },
+        other_assets: {
+          investments: Number(formData.assets.other_assets.investments) || 0,
+          intangible_assets: Number(formData.assets.other_assets.intangible_assets) || 0,
+          other_long_term_assets: Number(formData.assets.other_assets.other_long_term_assets) || 0
+        },
+        total_assets: totalAssets
       },
       liabilities: {
-        ...formData.liabilities,
-        total_liabilities: calculateTotalLiabilities()
+        current_liabilities: {
+          accounts_payable: Number(formData.liabilities.current_liabilities.accounts_payable) || 0,
+          short_term_loans: Number(formData.liabilities.current_liabilities.short_term_loans) || 0,
+          accrued_expenses: Number(formData.liabilities.current_liabilities.accrued_expenses) || 0,
+          other_current_liabilities: Number(formData.liabilities.current_liabilities.other_current_liabilities) || 0
+        },
+        long_term_liabilities: {
+          long_term_debt: Number(formData.liabilities.long_term_liabilities.long_term_debt) || 0,
+          deferred_tax_liabilities: Number(formData.liabilities.long_term_liabilities.deferred_tax_liabilities) || 0,
+          other_long_term_liabilities: Number(formData.liabilities.long_term_liabilities.other_long_term_liabilities) || 0
+        },
+        total_liabilities: totalLiabilities
       },
       equity: {
-        ...formData.equity,
-        total_equity: calculateTotalEquity()
-      }
+        capital: Number(formData.equity.capital) || 0,
+        retained_earnings: Number(formData.equity.retained_earnings) || 0,
+        current_year_profit: Number(formData.equity.current_year_profit) || 0,
+        other_equity: Number(formData.equity.other_equity) || 0,
+        total_equity: totalEquity
+      },
+      notes: formData.notes || ""
     };
+
+    // Validate the accounting equation
+    if (Math.abs(totalAssets - (totalLiabilities + totalEquity)) > 0.01) {
+      showAlert("Assets must equal Liabilities plus Equity", "error");
+      return;
+    }
 
     try {
       if (isEditing) {
-        await axios.put(`http://localhost:8080/api/balancesheet/${editingId}`, payload);
+        console.log('Updating balance sheet:', editingId, payload);
+        const response = await axios.put(`http://localhost:8080/api/balancesheets/${editingId}`, payload);
+        console.log('Update response:', response.data);
         showAlert("Balance sheet updated successfully", "success");
       } else {
-        await axios.post("http://localhost:8080/api/balancesheet", payload);
+        console.log('Creating new balance sheet:', payload);
+        const response = await axios.post("http://localhost:8080/api/balancesheets", payload);
+        console.log('Create response:', response.data);
         showAlert("Balance sheet added successfully", "success");
       }
       resetForm();
       fetchBalanceData();
     } catch (error) {
-      showAlert(error.response?.data?.error || "Operation failed", "error");
+      console.error("Error submitting balance sheet:", error.response?.data || error);
+      showAlert(
+        error.response?.data?.error || 
+        error.response?.data?.message || 
+        "Operation failed", 
+        "error"
+      );
     }
-  };
-
-  const handleEdit = (id) => {
-    const entry = balanceData.find(item => item._id === id);
-    if (!entry) return showAlert("Entry not found", "error");
-
-    setFormData(entry);
-    setEditingId(id);
-    setIsEditing(true);
   };
 
   const handleDelete = async (id) => {
     try {
-      await axios.delete(`http://localhost:8080/api/balancesheet/${id}`);
+      await axios.delete(`http://localhost:8080/api/balancesheets/${id}`);
       showAlert("Balance sheet deleted successfully", "success");
       fetchBalanceData();
     } catch (error) {
@@ -294,12 +376,13 @@ const BalanceSheetForm = () => {
   const isBalanced = Math.abs(totalAssets - (totalLiabilities + totalEquity)) < 0.01;
 
   const formatCurrency = (value) => {
-    return new Intl.NumberFormat('en-US', {
+    return new Intl.NumberFormat('en-LK', {
       style: 'currency',
-      currency: 'USD',
+      currency: 'LKR',
       minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    }).format(value);
+      maximumFractionDigits: 2,
+      currencyDisplay: 'narrowSymbol'
+    }).format(value).replace('LKR', 'Rs.');
   };
 
   return (
@@ -776,6 +859,37 @@ const BalanceSheetForm = () => {
           </Table>
         </TableContainer>
       </Paper>
+
+      {/* PDF Export Section */}
+      {balanceData.length > 0 && (
+        <Paper elevation={3} sx={{ p: 3, mt: 4, borderRadius: 2 }}>
+          <Typography
+            variant="h6"
+            sx={{
+              color: '#3998ff',
+              fontWeight: 'bold',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1,
+              mb: 2,
+            }}
+          >
+            🖨️ Export Balance Sheet
+          </Typography>
+          <DownloadPDFButton
+            documentType="balance-sheet"
+            data={balanceData}
+            fileName="balance_sheet.pdf"
+            sx={{
+              backgroundColor: '#3998ff',
+              color: 'white',
+              '&:hover': {
+                backgroundColor: '#2979ff',
+              },
+            }}
+          />
+        </Paper>
+      )}
     </Container>
   );
 };

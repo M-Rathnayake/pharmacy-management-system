@@ -113,15 +113,61 @@ const updateBalanceSheet = async (req, res) => {
         if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
             return res.status(400).json({ error: 'Invalid ID format' });
         }
-        const updatedSheet = await BalanceSheet.findByIdAndUpdate(
-            req.params.id,
-            req.body,
-            { new: true, runValidators: true }
-        );
 
-        if (!updatedSheet) {
+        // Find the existing document first
+        const existingSheet = await BalanceSheet.findById(req.params.id);
+        if (!existingSheet) {
             return res.status(404).json({ error: 'Balance sheet not found' });
         }
+
+        // Merge the existing data with the updates
+        const updatedData = {
+            ...existingSheet.toObject(),
+            ...req.body,
+            assets: {
+                ...existingSheet.assets,
+                ...req.body.assets,
+                current_assets: {
+                    ...existingSheet.assets?.current_assets,
+                    ...req.body.assets?.current_assets
+                },
+                fixed_assets: {
+                    ...existingSheet.assets?.fixed_assets,
+                    ...req.body.assets?.fixed_assets
+                },
+                other_assets: {
+                    ...existingSheet.assets?.other_assets,
+                    ...req.body.assets?.other_assets
+                }
+            },
+            liabilities: {
+                ...existingSheet.liabilities,
+                ...req.body.liabilities,
+                current_liabilities: {
+                    ...existingSheet.liabilities?.current_liabilities,
+                    ...req.body.liabilities?.current_liabilities
+                },
+                long_term_liabilities: {
+                    ...existingSheet.liabilities?.long_term_liabilities,
+                    ...req.body.liabilities?.long_term_liabilities
+                }
+            },
+            equity: {
+                ...existingSheet.equity,
+                ...req.body.equity
+            }
+        };
+
+        // Update the document
+        const updatedSheet = await BalanceSheet.findByIdAndUpdate(
+            req.params.id,
+            updatedData,
+            { 
+                new: true, 
+                runValidators: true,
+                context: 'query'
+            }
+        );
 
         console.log('Updated balance sheet:', JSON.stringify(updatedSheet, null, 2));
         res.json(updatedSheet);

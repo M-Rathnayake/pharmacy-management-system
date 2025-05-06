@@ -47,21 +47,27 @@ function FinancialDashboard() {
             <ListItem button component={Link} to="/main">
               <ListItemText primary="Main" />
             </ListItem>
-            <ListItem button component={Link} to="/balance-sheet">
-              <ListItemText primary="Balance Sheet" />
-            </ListItem>
-            <ListItem button component={Link} to="/bank-book">
-              <ListItemText primary="Bank Book" />
-            </ListItem>
+
             <ListItem button component={Link} to="/profit-loss">
               <ListItemText primary="Profit & Loss" />
             </ListItem>
+
+            <ListItem button component={Link} to="/balance-sheet">
+              <ListItemText primary="Balance Sheet" />
+            </ListItem>
+
+            <ListItem button component={Link} to="/bank-book">
+              <ListItemText primary="Bank Book" />
+            </ListItem>
+
             <ListItem button component={Link} to="/ledger">
               <ListItemText primary="Ledger" />
             </ListItem>
+
             <ListItem button component={Link} to="/salary">
               <ListItemText primary="Salary" />
             </ListItem>
+
             <ListItem button component={Link} to="/petty-cash">
               <ListItemText primary="Petty Cash" />
             </ListItem>
@@ -75,10 +81,11 @@ function FinancialDashboard() {
         >
           <Routes>
             <Route path="/main" element={<MainForm/>} />
+            <Route path="/profit-loss" element={<ProfitLossForm/>} />
             <Route path="/balance-sheet" element={<BalanceSheet />} />
             {/* Add routes for other sections here */}
             <Route path="/bank-book" element={<BankBookForm/>} />
-            <Route path="/profit-loss" element={<ProfitLossForm/>} />
+            
             <Route path="/ledger" element={<LedgerForm/>} />
             <Route path="/salary" element={<SalaryForm/>} />
             <Route path="/petty-cash" element={<PettyCashForm/>} />

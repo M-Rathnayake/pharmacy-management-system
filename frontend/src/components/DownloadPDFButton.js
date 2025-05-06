@@ -1,7 +1,8 @@
 import React from 'react';
-import { Button } from '@mui/material';
+import { Button, Box } from '@mui/material';
 import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable'; // Explicitly import autoTable
+import autoTable from 'jspdf-autotable';
+import { Download, Visibility } from '@mui/icons-material';
 
 const DownloadPDFButton = ({ documentType, data, fileName, sx }) => {
   const handleDownload = (openInViewer = false) => {
@@ -24,45 +25,73 @@ const DownloadPDFButton = ({ documentType, data, fileName, sx }) => {
       // Add title
       doc.setFontSize(14);
       doc.setTextColor(0, 0, 0); // Black
-      doc.text(`${documentType} Report`, 14, 30);
+      doc.text(`${documentType === 'profit-loss' ? 'Profit & Loss Statement' : 'Balance Sheet'} Report`, 14, 30);
 
       // Add line separator
       doc.setDrawColor(57, 152, 255); // #3998ff
       doc.setLineWidth(0.5);
       doc.line(14, 35, 200, 35);
 
-      // Prepare table data
-      const columns = [
-        { header: 'Period', dataKey: 'period' },
-        { header: 'Revenue (Rs.)', dataKey: 'revenue' },
-        { header: 'Expenses (Rs.)', dataKey: 'expenses' },
-        { header: 'Net Profit (Rs.)', dataKey: 'net_Profit' },
-      ];
+      let columns, rows;
 
-      const rows = data.map((item) => {
-        // Validate item
-        if (
-          !item.period ||
-          typeof item.revenue !== 'number' ||
-          typeof item.expenses !== 'number' ||
-          typeof item.profit !== 'number'
-        ) {
-          console.warn('Invalid data item:', item);
+      if (documentType === 'profit-loss') {
+        columns = [
+          { header: 'Period', dataKey: 'period' },
+          { header: 'Revenue (Rs.)', dataKey: 'revenue' },
+          { header: 'Expenses (Rs.)', dataKey: 'expenses' },
+          { header: 'Net Profit (Rs.)', dataKey: 'net_Profit' }
+        ];
+
+        rows = data.map((item) => {
+          // Validate item
+          if (
+            !item.period ||
+            typeof item.revenue !== 'number' ||
+            typeof item.expenses !== 'number' ||
+            typeof item.profit !== 'number'
+          ) {
+            console.warn('Invalid data item:', item);
+            return {
+              period: item.period || 'N/A',
+              revenue: (typeof item.revenue === 'number' ? item.revenue : 0).toLocaleString('en-IN'),
+              expenses: (typeof item.expenses === 'number' ? item.expenses : 0).toLocaleString('en-IN'),
+              net_Profit: (typeof item.profit === 'number' ? item.profit : 0).toLocaleString('en-IN'),
+            };
+          }
+
+          return {
+            period: item.period,
+            revenue: item.revenue.toLocaleString('en-IN'),
+            expenses: item.expenses.toLocaleString('en-IN'),
+            net_Profit: item.profit.toLocaleString('en-IN'),
+          };
+        });
+      } else if (documentType === 'balance-sheet') {
+        columns = [
+          { header: 'Period', dataKey: 'period' },
+          { header: 'Date', dataKey: 'date' },
+          { header: 'Assets (Rs.)', dataKey: 'assets' },
+          { header: 'Liabilities (Rs.)', dataKey: 'liabilities' },
+          { header: 'Equity (Rs.)', dataKey: 'equity' },
+          { header: 'Status', dataKey: 'status' }
+        ];
+
+        rows = data.map((item) => {
+          const isBalanced = Math.abs(
+            item.assets.total_assets - 
+            (item.liabilities.total_liabilities + item.equity.total_equity)
+          ) < 0.01;
+
           return {
             period: item.period || 'N/A',
-            revenue: (typeof item.revenue === 'number' ? item.revenue : 0).toLocaleString('en-IN'),
-            expenses: (typeof item.expenses === 'number' ? item.expenses : 0).toLocaleString('en-IN'),
-            net_Profit: (typeof item.profit === 'number' ? item.profit : 0).toLocaleString('en-IN'),
+            date: new Date(item.period_date).toLocaleDateString('en-IN'),
+            assets: (item.assets?.total_assets || 0).toLocaleString('en-IN'),
+            liabilities: (item.liabilities?.total_liabilities || 0).toLocaleString('en-IN'),
+            equity: (item.equity?.total_equity || 0).toLocaleString('en-IN'),
+            status: isBalanced ? 'Balanced' : 'Imbalanced'
           };
-        }
-
-        return {
-          period: item.period,
-          revenue: item.revenue.toLocaleString('en-IN'),
-          expenses: item.expenses.toLocaleString('en-IN'),
-          net_Profit: item.profit.toLocaleString('en-IN'), // Use 'profit' from MongoDB
-        };
-      });
+        });
+      }
 
       // Add table
       autoTable(doc, {
@@ -84,9 +113,11 @@ const DownloadPDFButton = ({ documentType, data, fileName, sx }) => {
         },
         columnStyles: {
           0: { cellWidth: 'auto' }, // Period
-          1: { cellWidth: 'auto', halign: 'right' }, // Revenue
-          2: { cellWidth: 'auto', halign: 'right' }, // Expenses
-          3: { cellWidth: 'auto', halign: 'right' }, // Net Profit
+          1: { cellWidth: 'auto' }, // Date
+          2: { cellWidth: 'auto', halign: 'right' }, // Assets
+          3: { cellWidth: 'auto', halign: 'right' }, // Liabilities
+          4: { cellWidth: 'auto', halign: 'right' }, // Equity
+          5: { cellWidth: 'auto', halign: 'center' } // Status
         },
       });
 
@@ -104,7 +135,7 @@ const DownloadPDFButton = ({ documentType, data, fileName, sx }) => {
       }
 
       // Sanitize fileName
-      const sanitizedFileName = (fileName || `${documentType}_statement.pdf`).replace(
+      const sanitizedFileName = (fileName || `${documentType}_report.pdf`).replace(
         /[^a-zA-Z0-9._-]/g,
         '_'
       );
@@ -127,15 +158,15 @@ const DownloadPDFButton = ({ documentType, data, fileName, sx }) => {
   };
 
   return (
-    <div>
+    <Box sx={{ display: 'flex', gap: 2 }}>
       <Button
         variant="contained"
         onClick={() => handleDownload(false)}
+        startIcon={<Download />}
         sx={{
           backgroundColor: '#3998ff',
           color: 'white',
           '&:hover': { backgroundColor: '#2979ff' },
-          mr: 1,
           ...sx,
         }}
       >
@@ -144,15 +175,17 @@ const DownloadPDFButton = ({ documentType, data, fileName, sx }) => {
       <Button
         variant="outlined"
         onClick={() => handleDownload(true)}
+        startIcon={<Visibility />}
         sx={{
           borderColor: '#3998ff',
           color: '#3998ff',
           '&:hover': { borderColor: '#2979ff', color: '#2979ff' },
+          backgroundColor: 'white',
         }}
       >
         View PDF
       </Button>
-    </div>
+    </Box>
   );
 };
 

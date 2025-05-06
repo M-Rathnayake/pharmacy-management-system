@@ -74,6 +74,9 @@ const ProfitLossForm = () => {
     if (!period.trim()) {
       formErrors.period = "Period is required";
       isValid = false;
+    } else if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(period.trim())) {
+      formErrors.period = "Period is not in the correct format";
+      isValid = false;
     }
 
     if (revenue === "") {
@@ -287,7 +290,7 @@ const ProfitLossForm = () => {
               value={period}
               onChange={(e) => setPeriod(e.target.value)}
               error={Boolean(errors.period)}
-              helperText={errors.period || "E.g., 2023_01 or Jan-2023"}
+              helperText={errors.period || "E.g., 2023-01"}
               required
             />
           </Grid>

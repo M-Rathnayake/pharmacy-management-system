@@ -64,6 +64,12 @@ app.use("/api/salaries", salaryRoutes);
 app.use('/api/pdf', pdfRoutes);
 app.use('/api/financial-tips', financialTipsRoutes);
 
+// Add route logging middleware
+app.use((req, res, next) => {
+    console.log(`${new Date().toISOString()} - ${req.method} ${req.originalUrl}`);
+    next();
+});
+
 // Health check endpoint
 app.get('/api/health', (req, res) => {
     res.status(200).json({
@@ -79,7 +85,18 @@ app.use((req, res) => {
     res.status(404).json({
         error: 'Endpoint not found',
         path: req.originalUrl,
-        method: req.method
+        method: req.method,
+        availableRoutes: [
+            '/api/salaries',
+            '/api/Employee',
+            '/api/ledger',
+            '/api/bankbook',
+            '/api/balancesheets',
+            '/api/pettycash',
+            '/api/profitloss',
+            '/api/pdf',
+            '/api/financial-tips'
+        ]
     });
 });
 

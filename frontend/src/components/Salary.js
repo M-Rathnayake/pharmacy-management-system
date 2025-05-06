@@ -52,11 +52,19 @@ const SalaryForm = () => {
   const fetchSalaryData = async () => {
     try {
       setIsLoading(true);
+      console.log('Fetching salary data from:', "http://localhost:8080/api/salaries");
       const response = await axios.get("http://localhost:8080/api/salaries");
+      console.log('Salary data received:', response.data);
+      
+      if (!Array.isArray(response.data)) {
+        throw new Error('Invalid response format from server');
+      }
+
       setSalaryData(response.data);
     } catch (error) {
       console.error("Error fetching salary data:", error);
-      showAlert("Error fetching salary data", "error");
+      const errorMessage = error.response?.data?.error || error.response?.data?.message || "Error fetching salary data";
+      showAlert(errorMessage, "error");
     } finally {
       setIsLoading(false);
     }
@@ -65,10 +73,26 @@ const SalaryForm = () => {
   const fetchEmployees = async () => {
     try {
       setIsLoading(true);
-      const response = await axios.get("http://localhost:8080/api/employees");
-      setEmployees(response.data);
+      console.log('Fetching employees...');
+      const response = await axios.get("http://localhost:8080/api/Employee");
+      console.log('Employee data received:', response.data);
+      
+      if (!Array.isArray(response.data)) {
+        console.error('Invalid response format:', response.data);
+        throw new Error('Invalid response format from server');
+      }
+
+      // Sort employees by name for better usability
+      const sortedEmployees = response.data.sort((a, b) => 
+        `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`)
+      );
+      console.log('Sorted employees:', sortedEmployees);
+      setEmployees(sortedEmployees);
+      // Clear any previous error
+      setErrors(prev => ({ ...prev, employeeFetch: "" }));
     } catch (error) {
       console.error("Error fetching employees:", error);
+      setErrors(prev => ({ ...prev, employeeFetch: error.message || "Error fetching employee data" }));
       showAlert("Error fetching employees", "error");
     } finally {
       setIsLoading(false);
@@ -114,19 +138,22 @@ const SalaryForm = () => {
       employee_id: employeeId,
       month,
       basicSalary: Number(basicSalary),
-      overtime: Number(overtime),
-      epf_etf: Number(epfEtf),
+      overtime: Number(overtime) || 0,
+      epf_etf: Number(epfEtf) || 0,
       net_salary: Number(netSalary),
       paymentStatus,
     };
 
     try {
       setIsLoading(true);
+      console.log('Submitting salary data:', newData);
       if (!isEditing) {
-        await axios.post("http://localhost:8080/api/salaries", newData);
+        const response = await axios.post("http://localhost:8080/api/salaries", newData);
+        console.log('Salary added successfully:', response.data);
         showAlert("Salary entry added successfully", "success");
       } else {
-        await axios.put(`http://localhost:8080/api/salaries/${editingId}`, newData);
+        const response = await axios.put(`http://localhost:8080/api/salaries/${editingId}`, newData);
+        console.log('Salary updated successfully:', response.data);
         showAlert("Salary entry updated successfully", "success");
         setIsEditing(false);
         setEditingId(null);
@@ -136,7 +163,8 @@ const SalaryForm = () => {
       fetchSalaryData();
     } catch (error) {
       console.error("Error submitting data:", error);
-      showAlert(error.response?.data?.message || "Error submitting data", "error");
+      const errorMessage = error.response?.data?.error || error.response?.data?.message || "Error submitting data";
+      showAlert(errorMessage, "error");
     } finally {
       setIsLoading(false);
     }
@@ -171,12 +199,15 @@ const SalaryForm = () => {
   const handleDelete = async (id) => {
     try {
       setIsLoading(true);
+      console.log('Deleting salary record:', id);
       await axios.delete(`http://localhost:8080/api/salaries/${id}`);
+      console.log('Salary deleted successfully');
       showAlert("Salary entry deleted successfully", "success");
       fetchSalaryData();
     } catch (error) {
       console.error("Error deleting data:", error);
-      showAlert("Error deleting salary entry", "error");
+      const errorMessage = error.response?.data?.error || error.response?.data?.message || "Error deleting salary entry";
+      showAlert(errorMessage, "error");
     } finally {
       setIsLoading(false);
     }
@@ -187,6 +218,21 @@ const SalaryForm = () => {
   const totalOvertime = salaryData.reduce((sum, entry) => sum + entry.overtime, 0);
   const totalDeductions = salaryData.reduce((sum, entry) => sum + entry.epf_etf, 0);
   const totalNet = salaryData.reduce((sum, entry) => sum + entry.net_salary, 0);
+
+  // Add this new function to handle employee selection
+  const handleEmployeeSelect = (event) => {
+    const selectedEmployeeId = event.target.value;
+    console.log('Selected employee ID:', selectedEmployeeId);
+    setEmployeeId(selectedEmployeeId);
+    
+    // Find the selected employee and set their basic salary
+    const selectedEmployee = employees.find(emp => emp.employee_id === selectedEmployeeId);
+    console.log('Selected employee:', selectedEmployee);
+    if (selectedEmployee) {
+      setBasicSalary(selectedEmployee.basicSalary?.toString() || "0");
+      calculateNetSalary();
+    }
+  };
 
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
@@ -287,24 +333,77 @@ const SalaryForm = () => {
         
         <Grid container spacing={3} component="form" onSubmit={handleSubmit}>
           <Grid item xs={12} md={6}>
-            <FormControl fullWidth error={Boolean(errors.employeeId)}>
-              <InputLabel>Employee *</InputLabel>
-              <Select 
-                value={employeeId} 
-                onChange={(e) => setEmployeeId(e.target.value)}
-                label="Employee *"
-                disabled={isLoading}
+            <FormControl fullWidth error={Boolean(errors.employeeId || errors.employeeFetch)}>
+              <InputLabel>Select Employee *</InputLabel>
+              <Select
+                value={employeeId}
+                onChange={handleEmployeeSelect}
+                label="Select Employee *"
+                disabled={isLoading || isEditing}
+                displayEmpty
               >
-                {employees.map((emp) => (
-                  <MenuItem key={emp._id} value={emp._id}>
-                    {emp.name} ({emp.employeeId})
+                <MenuItem value="" disabled>
+                  <em>Select an employee</em>
+                </MenuItem>
+                {employees && employees.length > 0 ? (
+                  employees.map((employee) => (
+                    <MenuItem 
+                      key={employee.employee_id} 
+                      value={employee.employee_id}
+                      sx={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'flex-start',
+                        py: 1
+                      }}
+                    >
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Avatar 
+                          sx={{ 
+                            width: 32, 
+                            height: 32, 
+                            bgcolor: '#3998ff',
+                            fontSize: '0.875rem'
+                          }}
+                        >
+                          {employee.firstName?.[0]}{employee.lastName?.[0]}
+                        </Avatar>
+                        <Box>
+                          <Typography variant="subtitle1">
+                            {employee.firstName} {employee.lastName}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {employee.position} - {employee.department}
+                          </Typography>
+                        </Box>
+                      </Box>
+                    </MenuItem>
+                  ))
+                ) : (
+                  <MenuItem disabled>
+                    <Typography color="text.secondary">
+                      No employees available
+                    </Typography>
                   </MenuItem>
-                ))}
+                )}
               </Select>
               {errors.employeeId && (
-                <Typography variant="caption" color="error">
+                <Typography color="error" variant="caption">
                   {errors.employeeId}
                 </Typography>
+              )}
+              {errors.employeeFetch && (
+                <Typography color="error" variant="caption" sx={{ mt: 1 }}>
+                  {errors.employeeFetch}
+                </Typography>
+              )}
+              {isLoading && (
+                <Box sx={{ display: 'flex', alignItems: 'center', mt: 1 }}>
+                  <CircularProgress size={16} sx={{ mr: 1 }} />
+                  <Typography variant="caption" color="text.secondary">
+                    Loading employees...
+                  </Typography>
+                </Box>
               )}
             </FormControl>
           </Grid>
@@ -462,7 +561,7 @@ const SalaryForm = () => {
               <TableBody>
                 {salaryData.length > 0 ? (
                   salaryData.map((row) => {
-                    const employee = employees.find(emp => emp._id === row.employee_id);
+                    const employeeDetails = row.employeeDetails;
                     return (
                       <TableRow 
                         key={row._id}
@@ -472,7 +571,9 @@ const SalaryForm = () => {
                         }}
                       >
                         <TableCell>
-                          {employee ? `${employee.name} (${employee.employeeId})` : row.employee_id}
+                          {employeeDetails ? 
+                            `${employeeDetails.firstName} ${employeeDetails.lastName} (${row.employee_id})` : 
+                            row.employee_id}
                         </TableCell>
                         <TableCell>{row.month}</TableCell>
                         <TableCell align="right">{row.basicSalary.toLocaleString('en-IN')}</TableCell>

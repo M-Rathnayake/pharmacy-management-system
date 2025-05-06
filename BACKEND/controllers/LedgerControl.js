@@ -1,263 +1,185 @@
-const mongoose = require('mongoose');
+const { body, validationResult } = require('express-validator');
 const Ledger = require("../models/ledger");
 
-// Constants for validation
-const VALID_TRANSACTION_TYPES = ['debit', 'credit'];
-const MIN_AMOUNT = 0.01;
+const validateLedgerEntry = [
+  body('accountName')
+    .notEmpty().withMessage('Account name is required')
+    .trim()
+    .isLength({ max: 50 }).withMessage('Account name cannot exceed 50 characters'),
+  
+  body('accountCode')
+    .notEmpty().withMessage('Account code is required')
+    .trim()
+    .matches(/^[A-Z0-9-]+$/).withMessage('Account code can only contain uppercase letters, numbers and hyphens'),
+  
+  body('accountType')
+    .notEmpty().withMessage('Account type is required')
+    .isIn(['asset', 'liability', 'equity', 'revenue', 'expense']).withMessage('Invalid account type'),
+  
+  body('subAccountType')
+    .optional()
+    .isIn(['current', 'non-current', null]).withMessage('Invalid sub-account type'),
+  
+  body('openingBalance')
+    .isFloat().withMessage('Opening balance must be a number'),
+  
+  body('balanceType')
+    .notEmpty().withMessage('Balance type is required')
+    .isIn(['debit', 'credit']).withMessage('Balance type must be debit or credit'),
+  
+  body('taxApplicable')
+    .optional()
+    .isBoolean().withMessage('Tax applicable must be true or false'),
+  
+  body('taxRate')
+    .optional()
+    .isFloat({ min: 0, max: 100 }).withMessage('Tax rate must be between 0 and 100'),
+  
+  body('reconciliationFrequency')
+    .optional()
+    .isIn(['daily', 'weekly', 'monthly', 'quarterly', 'annually', 'never']).withMessage('Invalid reconciliation frequency'),
+  
+  (req, res, next) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+    
+    // Additional validation for conditional fields
+    if (req.body.taxApplicable === true && (req.body.taxRate === undefined || req.body.taxRate === null)) {
+      return res.status(400).json({ errors: [{ msg: 'Tax rate is required when tax is applicable' }] });
+    }
+    
+    if ((req.body.accountType === 'asset' || req.body.accountType === 'liability') && !req.body.subAccountType) {
+      return res.status(400).json({ errors: [{ msg: 'Sub-account type is required for assets and liabilities' }] });
+    }
+    
+    next();
+  }
+];
 
-// Helper function for date validation
-const validateDate = (dateString) => {
-    const date = new Date(dateString);
-    return !isNaN(date.getTime()) ? date : null;
+const getLedgers = async (req, res) => {
+  try {
+    const { type, active } = req.query;
+    const query = {};
+    
+    if (type) query.accountType = type;
+    if (active) query.isActive = active === 'true';
+    
+    const data = await Ledger.find(query)
+      .sort({ accountName: 1 })
+      .populate('createdBy', 'name email');
+      
+    res.status(200).json(data);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to fetch ledger accounts" });
+  }
 };
 
-// Add a new ledger entry
+const getLedgerById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const ledger = await Ledger.findById(id).populate('createdBy', 'name email');
+    
+    if (!ledger) {
+      return res.status(404).json({ error: "Ledger account not found" });
+    }
+    
+    res.status(200).json(ledger);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to fetch ledger account" });
+  }
+};
+
 const addLedger = async (req, res) => {
-    try {
-        const { account_name, transaction_type, description, date, amount } = req.body;
-
-        // Required field validation
-        if (!account_name || !transaction_type || amount === undefined) {
-            return res.status(400).json({ 
-                success: false,
-                error: "Account name, transaction type, and amount are required" 
-            });
-        }
-
-        // Transaction type validation
-        const normalizedType = transaction_type.toLowerCase();
-        if (!VALID_TRANSACTION_TYPES.includes(normalizedType)) {
-            return res.status(400).json({
-                success: false,
-                error: "Transaction type must be either 'debit' or 'credit'"
-            });
-        }
-
-        // Amount validation
-        const parsedAmount = Number(amount);
-        if (isNaN(parsedAmount) || parsedAmount < MIN_AMOUNT) {
-            return res.status(400).json({
-                success: false,
-                error: `Amount must be a valid number greater than or equal to ${MIN_AMOUNT}`
-            });
-        }
-
-        // Date handling
-        const transactionDate = date ? validateDate(date) : new Date();
-        if (!transactionDate) {
-            return res.status(400).json({
-                success: false,
-                error: "Invalid date format. Use ISO format (YYYY-MM-DD)"
-            });
-        }
-
-        const newEntry = new Ledger({
-            account_name: account_name.trim(),
-            transaction_type: normalizedType,
-            description: description ? description.trim() : "",
-            date: transactionDate,
-            amount: parsedAmount
-        });
-
-        const savedLedger = await newEntry.save();
-        
-        res.status(201).json({ 
-            success: true,
-            message: "Ledger entry added successfully", 
-            data: savedLedger 
-        });
-
-    } catch (error) {
-        console.error("Error adding ledger entry:", error);
-        res.status(500).json({ 
-            success: false,
-            error: "Internal Server Error", 
-            message: error.message 
-        });
+  try {
+    const { accountName, accountCode, accountType, subAccountType, openingBalance, balanceType } = req.body;
+    
+    // Check for duplicate account code
+    const existingLedger = await Ledger.findOne({ accountCode });
+    if (existingLedger) {
+      return res.status(400).json({ error: "Account with this code already exists" });
     }
+    
+    const newLedger = new Ledger({
+      ...req.body,
+      createdBy: req.user.id // Assuming you have user authentication
+    });
+    
+    const savedLedger = await newLedger.save();
+    res.status(201).json(savedLedger);
+  } catch (error) {
+    if (error.code === 11000) {
+      return res.status(400).json({ error: "Account with this name or code already exists" });
+    }
+    res.status(500).json({ error: "Failed to create new ledger account" });
+  }
 };
 
-// Get all ledger records with filtering
-const getLedger = async (req, res) => {
-    try {
-        const { account_name, transaction_type, startDate, endDate } = req.query;
-        
-        let query = {};
-        
-        if (account_name) query.account_name = account_name;
-        if (transaction_type) {
-            const normalizedType = transaction_type.toLowerCase();
-            if (!VALID_TRANSACTION_TYPES.includes(normalizedType)) {
-                return res.status(400).json({
-                    success: false,
-                    error: "Transaction type must be either 'debit' or 'credit'"
-                });
-            }
-            query.transaction_type = normalizedType;
-        }
-
-        if (startDate || endDate) {
-            query.date = {};
-            if (startDate) {
-                const start = validateDate(startDate);
-                if (!start) {
-                    return res.status(400).json({
-                        success: false,
-                        error: "Invalid start date format"
-                    });
-                }
-                query.date.$gte = start;
-            }
-            if (endDate) {
-                const end = validateDate(endDate);
-                if (!end) {
-                    return res.status(400).json({
-                        success: false,
-                        error: "Invalid end date format"
-                    });
-                }
-                query.date.$lte = end;
-            }
-        }
-
-        const data = await Ledger.find(query)
-            .sort({ date: -1, created_at: -1 });
-        
-        res.json({
-            success: true,
-            count: data.length,
-            data
-        });
-    } catch (error) {
-        console.error("Error fetching ledger data:", error);
-        res.status(500).json({ 
-            success: false,
-            message: "Error fetching ledger data", 
-            error: error.message 
-        });
-    }
-};
-
-// Update a ledger entry
 const updateLedger = async (req, res) => {
-    try {
-        const { id } = req.params;
-        const { account_name, transaction_type, description, date, amount } = req.body;
-
-        // Basic validation
-        if (!account_name || !transaction_type || amount === undefined) {
-            return res.status(400).json({ 
-                success: false,
-                error: "Account name, transaction type, and amount are required" 
-            });
-        }
-
-        // Transaction type validation
-        const normalizedType = transaction_type.toLowerCase();
-        if (!VALID_TRANSACTION_TYPES.includes(normalizedType)) {
-            return res.status(400).json({
-                success: false,
-                error: "Transaction type must be either 'debit' or 'credit'"
-            });
-        }
-
-        // Amount validation
-        const parsedAmount = Number(amount);
-        if (isNaN(parsedAmount) || parsedAmount < MIN_AMOUNT) {
-            return res.status(400).json({
-                success: false,
-                error: `Amount must be a valid number greater than or equal to ${MIN_AMOUNT}`
-            });
-        }
-
-        // Date validation
-        const transactionDate = date ? validateDate(date) : new Date();
-        if (!transactionDate) {
-            return res.status(400).json({
-                success: false,
-                error: "Invalid date format"
-            });
-        }
-
-        const updateData = {
-            account_name: account_name.trim(),
-            transaction_type: normalizedType,
-            description: description ? description.trim() : "",
-            date: transactionDate,
-            amount: parsedAmount
-        };
-
-        const updatedEntry = await Ledger.findByIdAndUpdate(
-            id,
-            updateData,
-            { new: true, runValidators: true }
-        );
-
-        if (!updatedEntry) {
-            return res.status(404).json({ 
-                success: false,
-                error: "Ledger entry not found" 
-            });
-        }
-
-        res.status(200).json({ 
-            success: true,
-            message: "Ledger entry updated successfully", 
-            data: updatedEntry 
-        });
-
-    } catch (error) {
-        console.error("Error updating ledger entry:", error);
-        res.status(500).json({ 
-            success: false,
-            error: "Internal Server Error", 
-            message: error.message 
-        });
+  try {
+    const { id } = req.params;
+    
+    // Prevent changing account code
+    if (req.body.accountCode) {
+      return res.status(400).json({ error: "Account code cannot be changed" });
     }
+    
+    const updatedLedger = await Ledger.findByIdAndUpdate(
+      id,
+      req.body,
+      { new: true, runValidators: true }
+    );
+    
+    if (!updatedLedger) {
+      return res.status(404).json({ error: "Ledger account not found" });
+    }
+    
+    res.status(200).json(updatedLedger);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to update ledger account" });
+  }
 };
 
-// Delete a ledger entry
+const toggleLedgerStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const ledger = await Ledger.findById(id);
+    
+    if (!ledger) {
+      return res.status(404).json({ error: "Ledger account not found" });
+    }
+    
+    ledger.isActive = !ledger.isActive;
+    const updatedLedger = await ledger.save();
+    
+    res.status(200).json(updatedLedger);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to toggle ledger status" });
+  }
+};
+
 const deleteLedger = async (req, res) => {
-    try {
-        const { id } = req.params;
-
-        if (!id) {
-            return res.status(400).json({ 
-                success: false,
-                error: "Entry ID is required" 
-            });
-        }
-
-        if (!mongoose.Types.ObjectId.isValid(id)) {
-            return res.status(400).json({
-                success: false,
-                error: "Invalid ID format"
-            });
-        }
-
-        const deletedEntry = await Ledger.findByIdAndDelete(id);
-
-        if (!deletedEntry) {
-            return res.status(404).json({ 
-                success: false,
-                error: "Ledger entry not found" 
-            });
-        }
-
-        res.status(200).json({ 
-            success: true,
-            message: "Ledger entry deleted successfully", 
-            data: deletedEntry 
-        });
-
-    } catch (error) {
-        console.error("Error deleting ledger entry:", error);
-        res.status(500).json({ 
-            success: false,
-            error: "Internal Server Error", 
-            message: error.message 
-        });
+  try {
+    const { id } = req.params;
+    const deletedLedger = await Ledger.findByIdAndDelete(id);
+    
+    if (!deletedLedger) {
+      return res.status(404).json({ error: "Ledger account not found" });
     }
+    
+    res.status(200).json({ message: "Ledger account deleted successfully" });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to delete ledger account" });
+  }
 };
 
-module.exports = { getLedger, addLedger, updateLedger, deleteLedger };
+module.exports = {
+  validateLedgerEntry,
+  getLedgers,
+  getLedgerById,
+  addLedger,
+  updateLedger,
+  toggleLedgerStatus,
+  deleteLedger
+};

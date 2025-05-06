@@ -4,7 +4,8 @@ const ProfitLoss = require("../models/ProfitLoss");
 const validateProfitLossEntry = [
   body('period')
     .notEmpty().withMessage('Period is required')
-    .trim(),
+    .trim()
+    .matches(/^\d{4}-(0[1-9]|1[0-2])$/).withMessage('Period is not in the correct format'),
   
   body('revenue')
     .isFloat({ min: 0 }).withMessage('Revenue must be a positive number'),

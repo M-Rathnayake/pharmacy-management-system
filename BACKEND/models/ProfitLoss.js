@@ -5,7 +5,7 @@ const profitLossSchema = new mongoose.Schema({
     type: String,
     required: [true, 'Period is required'],
     trim: true,
-    match: [/^[a-zA-Z0-9-_ ]+$/, 'Please enter a valid period']
+    match: [/^\d{4}-(0[1-9]|1[0-2])$/, 'Period is not in the correct format']
   },
   revenue: {
     type: Number,
