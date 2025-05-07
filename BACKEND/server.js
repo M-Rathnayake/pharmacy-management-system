@@ -9,7 +9,15 @@ const app = express();
 const PORT = process.env.PORT || 8080;
 const URL = process.env.MONGODB_URL; // Should be mongodb://localhost:27017/profitloss_db
 
-// Body parser middleware - simplified version
+// Add detailed request logging middleware
+app.use((req, res, next) => {
+    console.log(`[${new Date().toISOString()}] ${req.method} ${req.originalUrl}`);
+    console.log('Request Headers:', req.headers);
+    console.log('Request Body:', req.body);
+    next();
+});
+
+// Body parser middleware
 app.use(bodyParser.json({
     limit: '10mb',
     verify: (req, res, buf) => {
@@ -53,22 +61,36 @@ const salaryRoutes = require("./routes/salaryRoutes");
 const pdfRoutes = require('./routes/pdfRoutes');
 const financialTipsRoutes = require('./routes/financialTipsRoutes');
 
-// Mount Routes
-app.use("/api/bankbook", bankBookRoutes);
-app.use("/api/balancesheets", balanceSheetRoutes);
+// Log available routes
+console.log('\n=== Available API Routes ===');
+console.log('GET    /api/salaries');
+console.log('POST   /api/salaries');
+console.log('PUT    /api/salaries/:id');
+console.log('DELETE /api/salaries/:id');
+console.log('GET    /api/Employee');
+console.log('GET    /api/ledger');
+console.log('GET    /api/bankbook');
+console.log('GET    /api/balancesheets');
+console.log('GET    /api/pettycash');
+console.log('GET    /api/profitloss');
+console.log('GET    /api/pdf');
+console.log('GET    /api/financial-tips');
+console.log('========================\n');
+
+// Mount Routes with logging
+app.use("/api/salaries", (req, res, next) => {
+    console.log(`[Route] Salary route accessed: ${req.method} ${req.originalUrl}`);
+    next();
+}, salaryRoutes);
+
 app.use("/api/Employee", employeeRoutes);
 app.use("/api/ledger", ledgerRoutes);
+app.use("/api/bankbook", bankBookRoutes);
+app.use("/api/balancesheets", balanceSheetRoutes);
 app.use("/api/pettycash", pettyCashRoutes);
 app.use("/api/profitloss", profitLossRoutes);
-app.use("/api/salaries", salaryRoutes);
 app.use('/api/pdf', pdfRoutes);
 app.use('/api/financial-tips', financialTipsRoutes);
-
-// Add route logging middleware
-app.use((req, res, next) => {
-    console.log(`${new Date().toISOString()} - ${req.method} ${req.originalUrl}`);
-    next();
-});
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
@@ -81,7 +103,9 @@ app.get('/api/health', (req, res) => {
 
 // Catch-all for 404 errors
 app.use((req, res) => {
-    console.log(`404 Not Found: ${req.method} ${req.originalUrl}`);
+    console.log(`[404] Not Found: ${req.method} ${req.originalUrl}`);
+    console.log('Request Headers:', req.headers);
+    console.log('Request Body:', req.body);
     res.status(404).json({
         error: 'Endpoint not found',
         path: req.originalUrl,
@@ -100,9 +124,17 @@ app.use((req, res) => {
     });
 });
 
-// Improved error handling middleware
+// Error handling middleware
 app.use((err, req, res, next) => {
-    console.error('Error stack:', err.stack);
+    console.error('[Error]', err.stack);
+    console.error('[Error Details]', {
+        message: err.message,
+        name: err.name,
+        path: req.originalUrl,
+        method: req.method,
+        headers: req.headers,
+        body: req.body
+    });
 
     if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
         return res.status(400).json({
@@ -127,7 +159,9 @@ app.use((err, req, res, next) => {
 
     res.status(500).json({
         error: 'Internal server error',
-        requestId: req.id,
+        message: err.message,
+        path: req.originalUrl,
+        method: req.method,
         timestamp: new Date().toISOString()
     });
 });
@@ -138,33 +172,33 @@ const startServer = async () => {
         await connectDB();
 
         const server = app.listen(PORT, () => {
-            console.log(`Server is running on port: ${PORT}`);
-            console.log(`MongoDB connected: ${mongoose.connection.readyState === 1}`);
+            console.log(`[Server] Running on port: ${PORT}`);
+            console.log(`[Database] Connected: ${mongoose.connection.readyState === 1}`);
         });
 
         // Handle server shutdown gracefully
         process.on('SIGTERM', () => {
-            console.log('SIGTERM received. Shutting down gracefully...');
+            console.log('[Server] SIGTERM received. Shutting down gracefully...');
             server.close(() => {
                 mongoose.connection.close(false, () => {
-                    console.log('Server and MongoDB connection closed');
+                    console.log('[Server] Server and MongoDB connection closed');
                     process.exit(0);
                 });
             });
         });
 
         process.on('SIGINT', () => {
-            console.log('SIGINT received. Shutting down gracefully...');
+            console.log('[Server] SIGINT received. Shutting down gracefully...');
             server.close(() => {
                 mongoose.connection.close(false, () => {
-                    console.log('Server and MongoDB connection closed');
+                    console.log('[Server] Server and MongoDB connection closed');
                     process.exit(0);
                 });
             });
         });
 
     } catch (err) {
-        console.error('Failed to start server:', err);
+        console.error('[Server] Failed to start:', err);
         process.exit(1);
     }
 };

@@ -275,22 +275,22 @@ const SalaryForm = () => {
         
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 3 }}>
           <Chip 
-            label={`Basic: ₹${totalBasic.toLocaleString('en-IN')}`} 
+            label={`Basic: Rs. ${totalBasic.toLocaleString('en-LK')}`} 
             color="primary" 
             variant="outlined"
           />
           <Chip 
-            label={`Overtime: ₹${totalOvertime.toLocaleString('en-IN')}`} 
+            label={`Overtime: Rs. ${totalOvertime.toLocaleString('en-LK')}`} 
             color="success" 
             variant="outlined"
           />
           <Chip 
-            label={`Deductions: ₹${totalDeductions.toLocaleString('en-IN')}`} 
+            label={`Deductions: Rs. ${totalDeductions.toLocaleString('en-LK')}`} 
             color="error" 
             variant="outlined"
           />
           <Chip 
-            label={`Net Paid: ₹${totalNet.toLocaleString('en-IN')}`} 
+            label={`Net Paid: Rs. ${totalNet.toLocaleString('en-LK')}`} 
             color={totalNet >= 0 ? 'primary' : 'error'}
             sx={{ fontWeight: 'bold' }}
           />
@@ -424,7 +424,7 @@ const SalaryForm = () => {
           <Grid item xs={12} md={4}>
             <TextField
               fullWidth
-              label="Basic Salary (₹) *"
+              label="Basic Salary (Rs.) *"
               type="number"
               value={basicSalary}
               onChange={(e) => {
@@ -442,7 +442,7 @@ const SalaryForm = () => {
           <Grid item xs={12} md={4}>
             <TextField
               fullWidth
-              label="Overtime (₹)"
+              label="Overtime (Rs.)"
               type="number"
               value={overtime}
               onChange={(e) => setOvertime(e.target.value)}
@@ -454,7 +454,7 @@ const SalaryForm = () => {
           <Grid item xs={12} md={4}>
             <TextField
               fullWidth
-              label="EPF/ETF (₹)"
+              label="EPF/ETF (Rs.)"
               type="number"
               value={epfEtf}
               onChange={(e) => setEpfEtf(e.target.value)}
@@ -466,7 +466,7 @@ const SalaryForm = () => {
           <Grid item xs={12} md={6}>
             <TextField
               fullWidth
-              label="Net Salary (₹) *"
+              label="Net Salary (Rs.) *"
               type="number"
               value={netSalary}
               onChange={(e) => setNetSalary(e.target.value)}
@@ -550,10 +550,10 @@ const SalaryForm = () => {
                 <TableRow>
                   <TableCell sx={{ fontWeight: 'bold' }}>Employee</TableCell>
                   <TableCell sx={{ fontWeight: 'bold' }}>Month</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 'bold' }}>Basic (₹)</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 'bold' }}>Overtime (₹)</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 'bold' }}>Deductions (₹)</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 'bold' }}>Net (₹)</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 'bold' }}>Basic (Rs.)</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 'bold' }}>Overtime (Rs.)</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 'bold' }}>Deductions (Rs.)</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 'bold' }}>Net (Rs.)</TableCell>
                   <TableCell align="center" sx={{ fontWeight: 'bold' }}>Status</TableCell>
                   <TableCell align="center" sx={{ fontWeight: 'bold' }}>Actions</TableCell>
                 </TableRow>
@@ -576,12 +576,12 @@ const SalaryForm = () => {
                             row.employee_id}
                         </TableCell>
                         <TableCell>{row.month}</TableCell>
-                        <TableCell align="right">{row.basicSalary.toLocaleString('en-IN')}</TableCell>
+                        <TableCell align="right">Rs. {row.basicSalary.toLocaleString('en-LK')}</TableCell>
                         <TableCell align="right" sx={{ color: '#2e7d32' }}>
-                          {row.overtime.toLocaleString('en-IN')}
+                          Rs. {row.overtime.toLocaleString('en-LK')}
                         </TableCell>
                         <TableCell align="right" sx={{ color: '#d32f2f' }}>
-                          {row.epf_etf.toLocaleString('en-IN')}
+                          Rs. {row.epf_etf.toLocaleString('en-LK')}
                         </TableCell>
                         <TableCell 
                           align="right" 
@@ -590,7 +590,7 @@ const SalaryForm = () => {
                             color: row.net_salary >= 0 ? '#2e7d32' : '#d32f2f'
                           }}
                         >
-                          {row.net_salary.toLocaleString('en-IN')}
+                          Rs. {row.net_salary.toLocaleString('en-LK')}
                         </TableCell>
                         <TableCell align="center">
                           <Chip 
