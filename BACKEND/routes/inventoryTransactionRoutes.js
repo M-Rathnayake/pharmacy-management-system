@@ -24,10 +24,29 @@ router.post("/", async (req, res) => {
 // getting all the transactions
 router.get("/", async (req, res) => {
     try{
-        const transactions = await Transaction.find().populate("medicineId", "name barcode");
+        const transactions = await Transaction.find()
+            .populate({
+                path: "medicineId",
+                select: "name barcode",
+                options: { lean: true }
+            })
+            .sort({ timestamp: -1 }); // Sort by most recent first
+
+        // Handle cases where medicine might have been deleted
+        const enhancedTransactions = transactions.map(transaction => {
+            const transactionObj = transaction.toObject();
+            if (!transactionObj.medicineId) {
+                transactionObj.medicineId = {
+                    name: "Deleted Medicine",
+                    barcode: "N/A"
+                };
+            }
+            return transactionObj;
+        });
+
         res.status(200).json({
             success: true,
-            data: transactions
+            data: enhancedTransactions
         });
     }catch(error){
         res.status(500).json({ 
@@ -40,8 +59,22 @@ router.get("/", async (req, res) => {
 // getting transaction for a specific medicine
 router.get("/medicine/:medicineId", async (req, res) => {
     try{
+        // First check if medicine exists
+        const medicine = await Medicine.findById(req.params.medicineId);
+        if (!medicine) {
+            return res.status(404).json({
+                success: false,
+                error: "Medicine not found"
+            });
+        }
+
         const transactions = await Transaction.find({ medicineId: req.params.medicineId })
-            .populate("medicineId", "name barcode");
+            .populate({
+                path: "medicineId",
+                select: "name barcode",
+                options: { lean: true }
+            })
+            .sort({ timestamp: -1 }); // Sort by most recent first
             
         if(!transactions || transactions.length === 0){
             return res.status(200).json({

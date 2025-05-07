@@ -17,14 +17,10 @@ export const getAlerts = async () => {
 
 export const getAllUnresolvedAlerts = async () => {
   try {
-    const response = await axios.get(`${API_URL}`);
-    console.log('Full API Response:', response); 
-    
+    const response = await axios.get(`${API_URL}?status=unresolved`);
     if (response.data && response.data.success) {
       return Array.isArray(response.data.data) ? response.data.data : [];
     }
-    
-    console.error('Unexpected response structure:', response.data);
     return [];
   } catch (error) {
     console.error("Alerts Error:", error.response?.data || error.message);
@@ -34,11 +30,16 @@ export const getAllUnresolvedAlerts = async () => {
 
 export const resolveAlert = async (alertId) => {
   try {
-    await axios.patch(`${API_URL}/${alertId}`, { resolved: true });
-    return true;
+    const response = await axios.patch(`${API_URL}/${alertId}/resolve`);
+    if (response.data && response.data.success) {
+      return true;
+    }
+    // Pass the backend error message up
+    throw new Error(response.data?.error || "Unknown error");
   } catch (error) {
-    console.error("Resolve Error:", error.response?.data || error.message);
-    return false;
+    // Log and rethrow the error so the UI can show it
+    console.error("Resolve Error Details:", error);
+    throw error;
   }
 };
 

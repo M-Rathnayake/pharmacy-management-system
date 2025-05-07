@@ -26,9 +26,10 @@ app.use(bodyParser.json());
 
 const URL = process.env.MONGODB_URL;
 
-mongoose.connect(URL,{
-    useNewUrlParser: true,
-    useUnifiedTopology: true
+mongoose.connect(URL, {
+    ssl: true,
+    tls: true,
+    tlsAllowInvalidCertificates: false
 });
 
 const connection = mongoose.connection;

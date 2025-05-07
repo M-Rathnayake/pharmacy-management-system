@@ -31,7 +31,9 @@ import {
   TableContainer,
   TableHead,
   TableRow,
-  TablePagination
+  TablePagination,
+  Tabs,
+  Tab
 } from '@mui/material';
 import {
   Warning as WarningIcon,
@@ -47,7 +49,7 @@ import {
   DoneAll as DoneAllIcon,
   ArrowBack
 } from '@mui/icons-material';
-import { getAllUnresolvedAlerts, resolveAlert } from "../../services/alertService";
+import { getAlerts, resolveAlert } from "../../services/alertService";
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { useNavigate } from 'react-router-dom';
@@ -67,6 +69,7 @@ const AlertList = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [activeTab, setActiveTab] = useState(0); // 0 for unresolved, 1 for resolved
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -76,7 +79,7 @@ const AlertList = () => {
   const fetchAlerts = async () => {
     setLoading(true);
     try {
-      const data = await getAllUnresolvedAlerts();
+      const data = await getAlerts();
       setAlerts(data);
     } catch (error) {
       setError("Failed to fetch alerts: " + error.message);
@@ -97,19 +100,22 @@ const AlertList = () => {
   const handleConfirmResolve = async () => {
     try {
       await resolveAlert(alertToResolve._id);
-      fetchAlerts();
+      await fetchAlerts(); // Refresh the list
+      setError(null);
     } catch (error) {
-      setError("Failed to resolve alert: " + error.message);
+      setError(error.message || "Failed to resolve alert. Please try again.");
     } finally {
       setResolveDialogOpen(false);
+      setAlertToResolve(null);
     }
   };
 
   const handleConfirmResolveAll = async () => {
     try {
-      // Resolve all alerts in parallel
-      await Promise.all(alerts.map(alert => resolveAlert(alert._id)));
-      fetchAlerts();
+      const unresolvedAlerts = alerts.filter(alert => !alert.resolved);
+      await Promise.all(unresolvedAlerts.map(alert => resolveAlert(alert._id)));
+      await fetchAlerts();
+      setError(null);
     } catch (error) {
       setError("Failed to resolve all alerts: " + error.message);
     } finally {
@@ -133,6 +139,11 @@ const AlertList = () => {
   const handleChangeRowsPerPage = (event) => {
     setRowsPerPage(parseInt(event.target.value, 10));
     setPage(0);
+  };
+
+  const handleTabChange = (event, newValue) => {
+    setActiveTab(newValue);
+    setPage(0); // Reset to first page when changing tabs
   };
 
   const getAlertIcon = (type) => {
@@ -176,6 +187,11 @@ const AlertList = () => {
 
   const filteredAlerts = alerts
     .filter(alert => {
+      // First filter by resolved status
+      if (activeTab === 0 && alert.resolved) return false;
+      if (activeTab === 1 && !alert.resolved) return false;
+      
+      // Then apply type filter
       const matchesType = filterType === 'all' || alert.type === filterType;
       const matchesSearch = alert.message.toLowerCase().includes(searchQuery.toLowerCase());
       return matchesType && matchesSearch;
@@ -187,24 +203,17 @@ const AlertList = () => {
       return a.type.localeCompare(b.type);
     });
 
-  // Calculate summary statistics
-  const totalAlerts = alerts.length;
-  const lowStockAlerts = alerts.filter(alert => alert.type === 'low-stock').length;
-  const expiringAlerts = alerts.filter(alert => alert.type === 'near-expiry').length;
-  const expiredAlerts = alerts.filter(alert => alert.type === 'expired').length;
+  // Calculate summary statistics for unresolved alerts only
+  const unresolvedAlerts = alerts.filter(alert => !alert.resolved);
+  const totalAlerts = unresolvedAlerts.length;
+  const lowStockAlerts = unresolvedAlerts.filter(alert => alert.type === 'low-stock').length;
+  const expiringAlerts = unresolvedAlerts.filter(alert => alert.type === 'near-expiry').length;
+  const expiredAlerts = unresolvedAlerts.filter(alert => alert.type === 'expired').length;
 
   if (loading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
         <LinearProgress sx={{ width: '100%' }} />
-      </Box>
-    );
-  }
-
-  if (error) {
-    return (
-      <Box sx={{ p: 3 }}>
-        <Alert severity="error">{error}</Alert>
       </Box>
     );
   }
@@ -236,17 +245,19 @@ const AlertList = () => {
         </Box>
         
         <Box sx={{ display: 'flex', gap: 2 }}>
-          <Button
-            variant="contained"
-            startIcon={<DoneAllIcon />}
-            onClick={handleResolveAllClick}
-            sx={{ 
-              bgcolor: '#4caf50',
-              '&:hover': { bgcolor: '#388e3c' }
-            }}
-          >
-            Resolve All
-          </Button>
+          {activeTab === 0 && (
+            <Button
+              variant="contained"
+              startIcon={<DoneAllIcon />}
+              onClick={handleResolveAllClick}
+              sx={{ 
+                bgcolor: '#4caf50',
+                '&:hover': { bgcolor: '#388e3c' }
+              }}
+            >
+              Resolve All
+            </Button>
+          )}
           <Tooltip title="Refresh alerts">
             <IconButton onClick={fetchAlerts}>
               <RefreshIcon />
@@ -255,99 +266,47 @@ const AlertList = () => {
         </Box>
       </Box>
 
-      {/* Summary Cards */}
-      <Grid container spacing={3} sx={{ mb: 4 }}>
-        <Grid item xs={12} sm={6} md={3}>
-          <Card sx={{ bgcolor: '#e6f2ff', height: '100%' }}>
-            <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                <WarningIcon sx={{ color: '#1a5cb3', mr: 1 }} />
-                <Typography variant="h6" color="#1a5cb3">Total Alerts</Typography>
-              </Box>
-              <Typography variant="h4">{totalAlerts}</Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <Card sx={{ bgcolor: '#fff3e0', height: '100%' }}>
-            <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                <LocalPharmacyIcon sx={{ color: '#e65100', mr: 1 }} />
-                <Typography variant="h6" color="#e65100">Low Stock</Typography>
-              </Box>
-              <Typography variant="h4">{lowStockAlerts}</Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <Card sx={{ bgcolor: '#ffebee', height: '100%' }}>
-            <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                <TimerIcon sx={{ color: '#c62828', mr: 1 }} />
-                <Typography variant="h6" color="#c62828">Expiring Soon</Typography>
-              </Box>
-              <Typography variant="h4">{expiringAlerts}</Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <Card sx={{ bgcolor: '#ffcdd2', height: '100%' }}>
-            <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                <ErrorIcon sx={{ color: '#d32f2f', mr: 1 }} />
-                <Typography variant="h6" color="#d32f2f">Expired</Typography>
-              </Box>
-              <Typography variant="h4">{expiredAlerts}</Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-      </Grid>
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {error}
+        </Alert>
+      )}
 
-      {/* Filters Section */}
-      <Paper sx={{ p: 2, mb: 3 }}>
-        <Grid container spacing={2} alignItems="center">
-          <Grid item xs={12} md={4}>
-            <TextField
-              fullWidth
-              variant="outlined"
-              placeholder="Search alerts..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              InputProps={{
-                startAdornment: <SearchIcon sx={{ color: 'text.secondary', mr: 1 }} />
-              }}
-            />
-          </Grid>
-          <Grid item xs={12} md={4}>
-            <FormControl fullWidth>
-              <InputLabel>Filter by Type</InputLabel>
-              <Select
-                value={filterType}
-                label="Filter by Type"
-                onChange={(e) => setFilterType(e.target.value)}
-              >
-                <MenuItem value="all">All Types</MenuItem>
-                <MenuItem value="low-stock">Low Stock</MenuItem>
-                <MenuItem value="near-expiry">Expiring Soon</MenuItem>
-                <MenuItem value="expired">Expired</MenuItem>
-              </Select>
-            </FormControl>
-          </Grid>
-          <Grid item xs={12} md={4}>
-            <FormControl fullWidth>
-              <InputLabel>Sort by</InputLabel>
-              <Select
-                value={sortBy}
-                label="Sort by"
-                onChange={(e) => setSortBy(e.target.value)}
-              >
-                <MenuItem value="date">Date (Newest First)</MenuItem>
-                <MenuItem value="type">Alert Type</MenuItem>
-              </Select>
-            </FormControl>
-          </Grid>
-        </Grid>
-      </Paper>
+      {/* Tabs */}
+      <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>
+        <Tabs value={activeTab} onChange={handleTabChange}>
+          <Tab label={`Unresolved Alerts (${unresolvedAlerts.length})`} />
+          <Tab label={`Resolved Alerts (${alerts.length - unresolvedAlerts.length})`} />
+        </Tabs>
+      </Box>
+
+      {/* Filters */}
+      <Box sx={{ mb: 2, display: 'flex', gap: 2, alignItems: 'center' }}>
+        <FormControl sx={{ minWidth: 120 }}>
+          <InputLabel>Filter Type</InputLabel>
+          <Select
+            value={filterType}
+            label="Filter Type"
+            onChange={(e) => setFilterType(e.target.value)}
+          >
+            <MenuItem value="all">All Types</MenuItem>
+            <MenuItem value="low-stock">Low Stock</MenuItem>
+            <MenuItem value="near-expiry">Near Expiry</MenuItem>
+            <MenuItem value="expired">Expired</MenuItem>
+          </Select>
+        </FormControl>
+
+        <TextField
+          label="Search"
+          variant="outlined"
+          size="small"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          InputProps={{
+            startAdornment: <SearchIcon sx={{ mr: 1, color: 'text.secondary' }} />
+          }}
+        />
+      </Box>
 
       {/* Alerts Table */}
       <TableContainer component={Paper}>
@@ -355,62 +314,66 @@ const AlertList = () => {
           <TableHead>
             <TableRow>
               <TableCell>Type</TableCell>
+              <TableCell>Medicine</TableCell>
               <TableCell>Message</TableCell>
-              <TableCell>Created</TableCell>
-              <TableCell align="right">Actions</TableCell>
+              <TableCell>Date</TableCell>
+              <TableCell>Status</TableCell>
+              <TableCell>Actions</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
-            {filteredAlerts
-              .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-              .map((alert) => (
-                <TableRow 
-                  key={alert._id}
-                  sx={{ 
-                    bgcolor: getAlertColor(alert.type),
-                    '&:hover': {
-                      bgcolor: `${getAlertColor(alert.type)}dd`
-                    }
-                  }}
-                >
-                  <TableCell>
-                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                      {getAlertIcon(alert.type)}
-                      <Typography 
-                        sx={{ 
-                          ml: 1,
-                          color: getAlertTextColor(alert.type),
-                          textTransform: 'capitalize'
-                        }}
-                      >
-                        {alert.type.replace('-', ' ')}
-                      </Typography>
-                    </Box>
-                  </TableCell>
-                  <TableCell>{alert.message}</TableCell>
-                  <TableCell>
-                    <Chip 
-                      label={dayjs(alert.createdAt).fromNow()}
-                      size="small"
-                      sx={{ bgcolor: 'rgba(255, 255, 255, 0.8)' }}
-                    />
-                  </TableCell>
-                  <TableCell align="right">
-                    <Button
-                      variant="contained"
-                      startIcon={<CheckCircleIcon />}
-                      onClick={() => handleResolveClick(alert)}
-                      size="small"
-                      sx={{ 
-                        bgcolor: '#4caf50',
-                        '&:hover': { bgcolor: '#388e3c' }
-                      }}
-                    >
-                      Resolve
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
+            {filteredAlerts.length > 0 ? (
+              filteredAlerts
+                .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+                .map((alert) => (
+                  <TableRow key={alert._id}>
+                    <TableCell>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        {getAlertIcon(alert.type)}
+                        <Typography>
+                          {alert.type === 'low-stock' ? 'Low Stock' : 
+                           alert.type === 'near-expiry' ? 'Near Expiry' : 
+                           'Expired'}
+                        </Typography>
+                      </Box>
+                    </TableCell>
+                    <TableCell>
+                      {alert.medicineId?.name || 'Unknown Medicine'}
+                    </TableCell>
+                    <TableCell>{alert.message}</TableCell>
+                    <TableCell>
+                      {dayjs(alert.createdAt).fromNow()}
+                    </TableCell>
+                    <TableCell>
+                      <Chip 
+                        label={alert.resolved ? 'Resolved' : 'Active'}
+                        color={alert.resolved ? 'success' : 'warning'}
+                        size="small"
+                      />
+                    </TableCell>
+                    <TableCell>
+                      {!alert.resolved && (
+                        <Button
+                          startIcon={<CheckCircleIcon />}
+                          onClick={() => handleResolveClick(alert)}
+                          color="success"
+                          size="small"
+                        >
+                          Resolve
+                        </Button>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))
+            ) : (
+              <TableRow>
+                <TableCell colSpan={6} align="center">
+                  <Typography variant="body1" color="textSecondary">
+                    No alerts found
+                  </Typography>
+                </TableCell>
+              </TableRow>
+            )}
           </TableBody>
         </Table>
         <TablePagination
@@ -424,7 +387,7 @@ const AlertList = () => {
         />
       </TableContainer>
 
-      {/* Resolve Confirmation Dialog */}
+      {/* Resolve Dialog */}
       <Dialog
         open={resolveDialogOpen}
         onClose={handleCloseResolveDialog}
@@ -437,34 +400,26 @@ const AlertList = () => {
         </DialogContent>
         <DialogActions>
           <Button onClick={handleCloseResolveDialog}>Cancel</Button>
-          <Button 
-            onClick={handleConfirmResolve} 
-            color="success"
-            variant="contained"
-          >
+          <Button onClick={handleConfirmResolve} color="success" autoFocus>
             Resolve
           </Button>
         </DialogActions>
       </Dialog>
 
-      {/* Resolve All Confirmation Dialog */}
+      {/* Resolve All Dialog */}
       <Dialog
         open={resolveAllDialogOpen}
         onClose={handleCloseResolveAllDialog}
       >
-        <DialogTitle>Confirm Resolve All</DialogTitle>
+        <DialogTitle>Confirm Resolution</DialogTitle>
         <DialogContent>
           <DialogContentText>
-            Are you sure you want to mark all alerts as resolved? This action cannot be undone.
+            Are you sure you want to resolve all unresolved alerts?
           </DialogContentText>
         </DialogContent>
         <DialogActions>
           <Button onClick={handleCloseResolveAllDialog}>Cancel</Button>
-          <Button 
-            onClick={handleConfirmResolveAll} 
-            color="success"
-            variant="contained"
-          >
+          <Button onClick={handleConfirmResolveAll} color="success" autoFocus>
             Resolve All
           </Button>
         </DialogActions>
