@@ -16,7 +16,10 @@ import {
   Avatar,
   useTheme,
   useMediaQuery,
-  Button
+  Button,
+  Grid,
+  Link,
+  Paper
 } from '@mui/material';
 import {
   Menu as MenuIcon,
@@ -114,7 +117,7 @@ const StaffLayout = () => {
       <Box sx={{ p: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
         <PharmacyIcon sx={{ fontSize: 32, color: 'primary.main' }} />
         <Typography variant="h6" noWrap component="div">
-          Pharmacy MS
+          EsyPharma
         </Typography>
       </Box>
 
@@ -208,7 +211,7 @@ const StaffLayout = () => {
   );
 
   return (
-    <Box sx={{ display: 'flex', minHeight: '100vh' }}>
+    <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
       {/* Only show AppBar and Drawer when not in inventory section */}
       {!isInventorySection && (
         <>
@@ -221,6 +224,7 @@ const StaffLayout = () => {
                 easing: theme.transitions.easing.sharp,
                 duration: theme.transitions.duration.leavingScreen,
               }),
+              zIndex: theme.zIndex.drawer + 1,
             }}
           >
             <Toolbar>
@@ -260,6 +264,9 @@ const StaffLayout = () => {
               '& .MuiDrawer-paper': {
                 width: drawerWidth,
                 boxSizing: 'border-box',
+                position: 'fixed',
+                height: '100vh',
+                zIndex: theme.zIndex.drawer,
               },
             }}
           >
@@ -274,10 +281,105 @@ const StaffLayout = () => {
           flexGrow: 1,
           p: !isInventorySection ? 3 : 0,
           width: '100%',
-          mt: !isInventorySection ? 8 : 0
+          mt: !isInventorySection ? 8 : 0,
+          ml: {
+            md: !isInventorySection ? `${drawerOpen ? drawerWidth : 0}px` : 0
+          },
+          transition: theme.transitions.create(['margin'], {
+            easing: theme.transitions.easing.sharp,
+            duration: theme.transitions.duration.leavingScreen,
+          }),
+          display: 'flex',
+          flexDirection: 'column',
+          minHeight: '100vh',
         }}
       >
-        <Outlet />
+        <Container 
+          maxWidth="xl" 
+          sx={{ 
+            flex: 1,
+            display: 'flex',
+            flexDirection: 'column',
+            pb: 3 // Add padding bottom for spacing
+          }}
+        >
+          <Outlet />
+        </Container>
+
+        {/* Footer with adjusted positioning */}
+        <Paper 
+          component="footer" 
+          sx={{ 
+            py: 6, 
+            px: 2, 
+            backgroundColor: 'primary.dark',
+            color: 'white',
+            width: '100%',
+            position: 'relative',
+            zIndex: 1
+          }}
+        >
+          <Container maxWidth="lg">
+            <Grid container spacing={4}>
+              <Grid item xs={12} md={3}>
+                <Typography variant="h6" gutterBottom>
+                  EsyPharma
+                </Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ color: 'rgba(255,255,255,0.7)' }}>
+                  Your trusted pharmacy partner for all your healthcare needs.
+                </Typography>
+              </Grid>
+              <Grid item xs={12} md={3}>
+                <Typography variant="h6" gutterBottom>
+                  Quick Links
+                </Typography>
+                <List dense>
+                  <ListItem disablePadding>
+                    <ListItemButton component={Link} to="/" sx={{ color: 'white' }}>
+                      Home
+                    </ListItemButton>
+                  </ListItem>
+                  <ListItem disablePadding>
+                    <ListItemButton component={Link} to="/inventory" sx={{ color: 'white' }}>
+                      Products
+                    </ListItemButton>
+                  </ListItem>
+                  <ListItem disablePadding>
+                    <ListItemButton component={Link} to="/orders" sx={{ color: 'white' }}>
+                      Orders
+                    </ListItemButton>
+                  </ListItem>
+                </List>
+              </Grid>
+              <Grid item xs={12} md={3}>
+                <Typography variant="h6" gutterBottom>
+                  Contact Info
+                </Typography>
+                <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)' }}>
+                  123 Health Street<br />
+                  Medical District, City<br />
+                  Phone: (555) 123-4567<br />
+                  Email: info@esypharma.com
+                </Typography>
+              </Grid>
+              <Grid item xs={12} md={3}>
+                <Typography variant="h6" gutterBottom>
+                  Opening Hours
+                </Typography>
+                <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)' }}>
+                  Monday - Friday: 8:00 AM - 9:00 PM<br />
+                  Saturday: 9:00 AM - 7:00 PM<br />
+                  Sunday: 10:00 AM - 6:00 PM
+                </Typography>
+              </Grid>
+            </Grid>
+            <Box sx={{ mt: 4, pt: 2, borderTop: '1px solid rgba(255,255,255,0.1)', textAlign: 'center' }}>
+              <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)' }}>
+                © {new Date().getFullYear()} EsyPharma. All rights reserved.
+              </Typography>
+            </Box>
+          </Container>
+        </Paper>
       </Box>
 
       <LoginDialog

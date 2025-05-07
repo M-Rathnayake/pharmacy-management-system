@@ -2,13 +2,10 @@
 node_modules/
 
 # Environment files
-.env
-.env.local
 .env.*.local
 
 # IDE specific files
 .idea/
-.vscode/
 *.swp
 *.swo
 
@@ -39,3 +36,4 @@ coverage/
 # Temporary files
 tmp/
 temp/ 
+config.bat
