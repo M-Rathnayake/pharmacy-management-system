@@ -6,11 +6,11 @@ import {
   Chip, TextField, InputAdornment,
   Card, CardContent, Grid,
   MenuItem, Select, FormControl, InputLabel,
-  Stack
+  Stack, Container
 } from '@mui/material';
 import { 
   Search, Refresh, PictureAsPdf, TrendingUp, TrendingDown,
-  FilterList, DateRange
+  FilterList, DateRange, ArrowBack
 } from '@mui/icons-material';
 import { getTransactions } from "../../services/transactionService";
 import dayjs from 'dayjs';
@@ -27,6 +27,7 @@ import {
   Tooltip as ChartTooltip,
   Legend
 } from 'chart.js';
+import { useNavigate } from 'react-router-dom';
 
 // Register ChartJS components
 ChartJS.register(
@@ -40,9 +41,11 @@ ChartJS.register(
 );
 
 // Color constants
-const primaryBlue = '#3998ff';
+const primaryBlue = '#1a5cb3';
 const lightBlue = '#e6f2ff';
-const darkBlue = '#1a5cb3';
+const successGreen = '#2e7d32';
+const warningOrange = '#e65100';
+const errorRed = '#c62828';
 
 const TransactionLogs = () => {
   const [transactions, setTransactions] = useState([]);
@@ -50,7 +53,7 @@ const TransactionLogs = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [dateRange, setDateRange] = useState('all'); // 'all', 'today', 'week', 'month'
+  const [dateRange, setDateRange] = useState('all');
   const [transactionType, setTransactionType] = useState('all');
   const [summary, setSummary] = useState({
     totalTransactions: 0,
@@ -60,6 +63,7 @@ const TransactionLogs = () => {
     totalValue: 0,
     averageTransactionValue: 0
   });
+  const navigate = useNavigate();
 
   // Chart data state
   const [chartData, setChartData] = useState({
@@ -156,7 +160,7 @@ const TransactionLogs = () => {
         {
           label: 'Transaction Value',
           data: dailyData.map(d => d.value),
-          borderColor: '#2e7d32',
+          borderColor: successGreen,
           backgroundColor: '#e8f5e9',
           tension: 0.4,
           yAxisID: 'y1'
@@ -190,20 +194,28 @@ const TransactionLogs = () => {
       import('jspdf-autotable').then(() => {
         const doc = new jsPDF();
         
+        // Add EsyPharma logo/text to the top right
+        doc.setFontSize(16);
+        doc.setTextColor(57, 152, 255);
+        doc.text('EsyPharma', doc.internal.pageSize.width - 30, 20, { align: 'right' });
+        
+        // Main report title
         doc.setFontSize(18);
         doc.setTextColor(57, 152, 255); 
         doc.text('Transaction Report', 14, 20);
         
+        // Generation timestamp
         doc.setFontSize(10);
         doc.setTextColor(100, 100, 100);
         doc.text(`Generated on: ${new Date().toLocaleString()}`, 14, 28);
         
+        // Table data with fixed stock level arrows
         const tableData = filteredTransactions.map(txn => [
           dayjs(txn.timestamp).format('MMM D, YYYY'),
           txn.medicineId?.name || 'N/A',
           txn.type.toUpperCase(),
           txn.quantity,
-          `${txn.previousStock} → ${txn.newStock}`,
+          `${txn.previousStock} → ${txn.newStock}`, // Using text arrow instead of special character
           txn.notes || 'N/A'
         ]);
   
@@ -218,6 +230,12 @@ const TransactionLogs = () => {
           },
           alternateRowStyles: {
             fillColor: [230, 242, 255] 
+          },
+          columnStyles: {
+            4: { // Stock Change column
+              cellWidth: 40,
+              halign: 'center'
+            }
           }
         });
         
@@ -275,101 +293,68 @@ const TransactionLogs = () => {
 
   return (
     <Box sx={{ p: 3 }}>
+      {/* Header Section */}
       <Box sx={{ 
         display: 'flex', 
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        mb: 3
+        justifyContent: 'space-between', 
+        alignItems: 'center', 
+        mb: 3 
       }}>
-        <Typography variant="h4" sx={{ color: darkBlue, fontWeight: 'bold' }}>
-          Transaction History
-        </Typography>
-        
-        <Box sx={{ display: 'flex', gap: 2 }}>
-          <TextField
-            variant="outlined"
-            size="small"
-            placeholder="Search transactions..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <Search />
-                </InputAdornment>
-              ),
-            }}
-            sx={{ width: 300 }}
-          />
-          
-          <FormControl size="small" sx={{ minWidth: 120 }}>
-            <InputLabel>Date Range</InputLabel>
-            <Select
-              value={dateRange}
-              label="Date Range"
-              onChange={(e) => setDateRange(e.target.value)}
-              startAdornment={
-                <InputAdornment position="start">
-                  <DateRange />
-                </InputAdornment>
-              }
-            >
-              <MenuItem value="all">All Time</MenuItem>
-              <MenuItem value="today">Today</MenuItem>
-              <MenuItem value="week">Last 7 Days</MenuItem>
-              <MenuItem value="month">Last 30 Days</MenuItem>
-            </Select>
-          </FormControl>
-
-          <FormControl size="small" sx={{ minWidth: 120 }}>
-            <InputLabel>Type</InputLabel>
-            <Select
-              value={transactionType}
-              label="Type"
-              onChange={(e) => setTransactionType(e.target.value)}
-              startAdornment={
-                <InputAdornment position="start">
-                  <FilterList />
-                </InputAdornment>
-              }
-            >
-              <MenuItem value="all">All Types</MenuItem>
-              <MenuItem value="restock">Restock</MenuItem>
-              <MenuItem value="sale">Sale</MenuItem>
-              <MenuItem value="adjustment">Adjustment</MenuItem>
-            </Select>
-          </FormControl>
-          
-          <Tooltip title="Refresh data">
-            <IconButton onClick={loadTransactions} sx={{ color: primaryBlue }}>
-              <Refresh />
-            </IconButton>
-          </Tooltip>
-          
-          <Button
-            variant="outlined"
-            startIcon={<PictureAsPdf />}
-            onClick={downloadPDF}
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          <IconButton 
+            onClick={() => navigate('/inventory')}
             sx={{ 
-              borderColor: primaryBlue,
               color: primaryBlue,
               '&:hover': {
-                borderColor: darkBlue,
                 backgroundColor: lightBlue
               }
             }}
           >
+            <ArrowBack />
+          </IconButton>
+          <Typography variant="h4" component="h2" sx={{ color: primaryBlue, fontWeight: 'bold' }}>
+            Transaction History
+          </Typography>
+        </Box>
+        
+        <Box sx={{ display: 'flex', gap: 2 }}>
+          <Button
+            variant="contained"
+            startIcon={<PictureAsPdf />}
+            onClick={downloadPDF}
+            sx={{ 
+              bgcolor: primaryBlue,
+              '&:hover': { bgcolor: '#154c8c' }
+            }}
+          >
             Export PDF
           </Button>
+          <IconButton 
+            onClick={loadTransactions}
+            sx={{ 
+              color: primaryBlue,
+              '&:hover': {
+                backgroundColor: lightBlue
+              }
+            }}
+          >
+            <Refresh />
+          </IconButton>
         </Box>
       </Box>
 
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {error}
+        </Alert>
+      )}
+
       {/* Summary Cards */}
-      <Grid container spacing={3} sx={{ mb: 4 }}>
+      <Grid container spacing={2} sx={{ mb: 3 }}>
         <Grid item xs={12} sm={6} md={3}>
           <Card sx={{ bgcolor: lightBlue }}>
             <CardContent>
-              <Typography variant="h6" color={darkBlue}>Total Transactions</Typography>
+              <Typography variant="h6" color={primaryBlue}>Total Transactions</Typography>
               <Typography variant="h4">{summary.totalTransactions}</Typography>
             </CardContent>
           </Card>
@@ -377,7 +362,7 @@ const TransactionLogs = () => {
         <Grid item xs={12} sm={6} md={3}>
           <Card sx={{ bgcolor: '#e8f5e9' }}>
             <CardContent>
-              <Typography variant="h6" color="#2e7d32">Total Value</Typography>
+              <Typography variant="h6" color={successGreen}>Total Value</Typography>
               <Typography variant="h4">${summary.totalValue.toFixed(2)}</Typography>
             </CardContent>
           </Card>
@@ -385,7 +370,7 @@ const TransactionLogs = () => {
         <Grid item xs={12} sm={6} md={3}>
           <Card sx={{ bgcolor: '#fff3e0' }}>
             <CardContent>
-              <Typography variant="h6" color="#e65100">Avg. Value</Typography>
+              <Typography variant="h6" color={warningOrange}>Avg. Value</Typography>
               <Typography variant="h4">${summary.averageTransactionValue.toFixed(2)}</Typography>
             </CardContent>
           </Card>
@@ -393,46 +378,112 @@ const TransactionLogs = () => {
         <Grid item xs={12} sm={6} md={3}>
           <Card sx={{ bgcolor: '#ffebee' }}>
             <CardContent>
-              <Typography variant="h6" color="#c62828">Sales</Typography>
+              <Typography variant="h6" color={errorRed}>Sales</Typography>
               <Typography variant="h4">{summary.totalSales}</Typography>
             </CardContent>
           </Card>
         </Grid>
       </Grid>
 
+      {/* Filters Section */}
+      <Box sx={{ mb: 3, display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+        <TextField
+          fullWidth
+          variant="outlined"
+          placeholder="Search transactions..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <Search />
+              </InputAdornment>
+            ),
+          }}
+          sx={{ flex: 2, minWidth: 300 }}
+        />
+        
+        <FormControl sx={{ minWidth: 150 }}>
+          <InputLabel>Date Range</InputLabel>
+          <Select
+            value={dateRange}
+            label="Date Range"
+            onChange={(e) => setDateRange(e.target.value)}
+            startAdornment={
+              <InputAdornment position="start">
+                <DateRange />
+              </InputAdornment>
+            }
+          >
+            <MenuItem value="all">All Time</MenuItem>
+            <MenuItem value="today">Today</MenuItem>
+            <MenuItem value="week">Last 7 Days</MenuItem>
+            <MenuItem value="month">Last 30 Days</MenuItem>
+          </Select>
+        </FormControl>
+
+        <FormControl sx={{ minWidth: 150 }}>
+          <InputLabel>Type</InputLabel>
+          <Select
+            value={transactionType}
+            label="Type"
+            onChange={(e) => setTransactionType(e.target.value)}
+            startAdornment={
+              <InputAdornment position="start">
+                <FilterList />
+              </InputAdornment>
+            }
+          >
+            <MenuItem value="all">All Types</MenuItem>
+            <MenuItem value="restock">Restock</MenuItem>
+            <MenuItem value="sale">Sale</MenuItem>
+            <MenuItem value="adjustment">Adjustment</MenuItem>
+          </Select>
+        </FormControl>
+      </Box>
+
       {/* Transaction Trends Chart */}
-      <Card sx={{ mb: 4 }}>
+      <Card sx={{ mb: 4, boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
         <CardContent>
-          <Typography variant="h6" sx={{ mb: 2 }}>Transaction Trends</Typography>
+          <Typography variant="h6" sx={{ mb: 2, color: primaryBlue }}>Transaction Trends</Typography>
           <Box sx={{ height: 300 }}>
             <Line data={chartData} options={chartOptions} />
           </Box>
         </CardContent>
       </Card>
 
+      {/* Transactions Table */}
       <TableContainer 
         component={Paper} 
         sx={{ 
-          border: `1px solid ${primaryBlue}`,
-          borderRadius: 1,
           boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
         }}
       >
         <Table>
           <TableHead>
             <TableRow sx={{ bgcolor: lightBlue }}>
-              <TableCell sx={{ color: darkBlue, fontWeight: 600 }}>Date & Time</TableCell>
-              <TableCell sx={{ color: darkBlue, fontWeight: 600 }}>Medicine</TableCell>
-              <TableCell sx={{ color: darkBlue, fontWeight: 600 }}>Type</TableCell>
-              <TableCell align="right" sx={{ color: darkBlue, fontWeight: 600 }}>Quantity</TableCell>
-              <TableCell align="right" sx={{ color: darkBlue, fontWeight: 600 }}>Stock Change</TableCell>
-              <TableCell sx={{ color: darkBlue, fontWeight: 600 }}>Notes</TableCell>
+              <TableCell sx={{ color: primaryBlue, fontWeight: 600 }}>Date & Time</TableCell>
+              <TableCell sx={{ color: primaryBlue, fontWeight: 600 }}>Medicine</TableCell>
+              <TableCell sx={{ color: primaryBlue, fontWeight: 600 }}>Type</TableCell>
+              <TableCell align="right" sx={{ color: primaryBlue, fontWeight: 600 }}>Quantity</TableCell>
+              <TableCell align="right" sx={{ color: primaryBlue, fontWeight: 600 }}>Stock Change</TableCell>
+              <TableCell sx={{ color: primaryBlue, fontWeight: 600 }}>Notes</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {filteredTransactions.length > 0 ? (
               filteredTransactions.map((txn) => (
-                <TableRow key={txn._id} hover>
+                <TableRow 
+                  key={txn._id} 
+                  hover
+                  sx={{ 
+                    '&:hover': { 
+                      backgroundColor: txn.type === 'restock' ? '#e8f5e9' : 
+                                     txn.type === 'sale' ? '#ffebee' : '#fff3e0',
+                      opacity: 0.8
+                    }
+                  }}
+                >
                   <TableCell>
                     <Typography variant="body2">
                       {dayjs(txn.timestamp).format('MMM D, YYYY')}
@@ -459,8 +510,8 @@ const TransactionLogs = () => {
                           txn.type === 'restock' ? '#e8f5e9' : 
                           txn.type === 'sale' ? '#ffebee' : '#fff3e0',
                         color: 
-                          txn.type === 'restock' ? '#2e7d32' : 
-                          txn.type === 'sale' ? '#c62828' : '#e65100',
+                          txn.type === 'restock' ? successGreen : 
+                          txn.type === 'sale' ? errorRed : warningOrange,
                         fontWeight: 500
                       }}
                     />
@@ -480,15 +531,15 @@ const TransactionLogs = () => {
                       <Typography 
                         variant="body2" 
                         sx={{ 
-                          color: txn.newStock > txn.previousStock ? '#2e7d32' : '#c62828',
+                          color: txn.newStock > txn.previousStock ? successGreen : errorRed,
                           fontWeight: 500
                         }}
                       >
                         {txn.previousStock} → {txn.newStock}
                       </Typography>
                       {txn.newStock > txn.previousStock ? 
-                        <TrendingUp sx={{ color: '#2e7d32', fontSize: 16 }} /> : 
-                        <TrendingDown sx={{ color: '#c62828', fontSize: 16 }} />
+                        <TrendingUp sx={{ color: successGreen, fontSize: 16 }} /> : 
+                        <TrendingDown sx={{ color: errorRed, fontSize: 16 }} />
                       }
                     </Box>
                   </TableCell>
