@@ -43,6 +43,20 @@ export const resolveAlert = async (alertId) => {
   }
 };
 
+// Add new function to sync alerts
+export const syncAlerts = async () => {
+  try {
+    const response = await axios.post(`${API_URL}/sync`);
+    if (response.data && response.data.success) {
+      return response.data;
+    }
+    throw new Error(response.data?.error || "Failed to sync alerts");
+  } catch (error) {
+    console.error("Sync Error:", error);
+    throw error;
+  }
+};
+
 // Mock alerts related functions
 export const createMockAlert = (alertData) => {
   const alerts = JSON.parse(localStorage.getItem('mockAlerts') || '[]');

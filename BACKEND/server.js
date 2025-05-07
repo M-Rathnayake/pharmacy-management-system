@@ -37,52 +37,64 @@ const connection = mongoose.connection;
 connection.once("open", () =>{
     console.log("MongoDB Connection Successful!");
 
-    // sheduling alert checks
-    cron.schedule('0 11 * * *', async () => {
+    // scheduling alert checks - run at 6 AM and 2 PM
+    cron.schedule('0 6,14 * * *', async () => {
+        const startTime = Date.now();
         try{
-            // low stock check
+            // low stock check - modified to check current stock only
             const lowStockMeds = await Medicine.find({
-                $expr: { $lt: ["$stock", "$threshold"] },
-                'alerts.lowStockSent': false
+                $expr: { $lt: ["$stock", "$threshold"] }
             });
 
             console.log(`[CRON] Found ${lowStockMeds.length} low stock items`);
 
             for (const med of lowStockMeds){
                 try{
-                    await Alert.create({
+                    // Check if there's a recent low stock alert (within last 24 hours)
+                    const lastAlert = await Alert.findOne({
                         medicineId: med._id,
                         type: "low-stock",
-                        message: `${med.name} stock is low (${med.stock} remaining)`
+                        createdAt: { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) }
                     });
-                    med.alerts.lowStockSent = true;
-                    await med.save();
+
+                    // Only create new alert if there isn't a recent one
+                    if (!lastAlert) {
+                        await Alert.create({
+                            medicineId: med._id,
+                            type: "low-stock",
+                            message: `${med.name} stock is low (${med.stock} remaining)`
+                        });
+                    }
                 }catch(error){
                     console.error(`[CRON] Error processing low stock ${med._id}:`, error.message);
                 }
             }
 
-            // near-expiry check
+            // near-expiry and expired check
             const now = new Date();
             const startOfToday = new Date(now);
             startOfToday.setHours(0, 0, 0, 0);
 
-            // Check for expired medicines
+            // Check for expired medicines - include those that were previously alerted
             const expiredMeds = await Medicine.find({
-                expiryDate: { $lt: startOfToday },
-                'alerts.expirySent': false
+                expiryDate: { $lt: startOfToday }
             });
 
             for(const med of expiredMeds) {
                 try {
-                    await Alert.create({
+                    // Create new alert if none exists or last alert is more than 7 days old
+                    const lastAlert = await Alert.findOne({
                         medicineId: med._id,
-                        type: "expired",
-                        message: `${med.name} has expired on ${med.expiryDate.toDateString()}`
-                    });
+                        type: "expired"
+                    }).sort({ createdAt: -1 });
 
-                    med.alerts.expirySent = true;
-                    await med.save();
+                    if (!lastAlert || (now - lastAlert.createdAt) > (7 * 24 * 60 * 60 * 1000)) {
+                        await Alert.create({
+                            medicineId: med._id,
+                            type: "expired",
+                            message: `${med.name} has expired on ${med.expiryDate.toDateString()}`
+                        });
+                    }
                 } catch(error) {
                     console.error(`Failed expired alert for ${med._id}:`, error);
                 }
@@ -99,21 +111,26 @@ connection.once("open", () =>{
                 expiryDate: { 
                     $gte: startOfToday,
                     $lt: expiryDateThreshold
-                },
-                'alerts.expirySent': false
+                }
             });
 
             for(const med of expiringMeds) {
                 try {
                     const daysUntilExpiry = Math.floor((med.expiryDate - startOfToday) / (1000 * 60 * 60 * 24));
-                    await Alert.create({
+                    
+                    // Create new alert if none exists or last alert is more than 7 days old
+                    const lastAlert = await Alert.findOne({
                         medicineId: med._id,
-                        type: "near-expiry",
-                        message: `${med.name} expires in ${daysUntilExpiry} days (${med.expiryDate.toDateString()})`
-                    });
+                        type: "near-expiry"
+                    }).sort({ createdAt: -1 });
 
-                    med.alerts.expirySent = true;
-                    await med.save();
+                    if (!lastAlert || (now - lastAlert.createdAt) > (7 * 24 * 60 * 60 * 1000)) {
+                        await Alert.create({
+                            medicineId: med._id,
+                            type: "near-expiry",
+                            message: `${med.name} expires in ${daysUntilExpiry} days (${med.expiryDate.toDateString()})`
+                        });
+                    }
                 } catch(error) {
                     console.error(`Failed expiry alert for ${med._id}:`, error);
                 }

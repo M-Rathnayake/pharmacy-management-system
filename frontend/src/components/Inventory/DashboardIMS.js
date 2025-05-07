@@ -5,7 +5,8 @@ import {
   Typography, Button, Table, TableBody, TableCell, TableContainer, TableHead,
   TableRow, Paper, CircularProgress, Alert as MuiAlert, Dialog,
   DialogTitle, DialogContent, DialogContentText, DialogActions,
-  ListItemIcon, Chip, Divider, Stack, Grid, Link as MuiLink
+  ListItemIcon, Chip, Divider, Stack, Grid, Link as MuiLink,
+  Avatar
 } from '@mui/material';
 import { 
   Notifications, 
@@ -17,7 +18,8 @@ import {
   Inventory,
   Category,
   Warning,
-  TrendingUp
+  TrendingUp,
+  ExitToApp
 } from '@mui/icons-material';
 import { 
   LineChart, 
@@ -35,6 +37,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { getMedicines, deleteMedicine, getMockTransactions } from "../../services/medicineService";
 import { getAllUnresolvedAlerts } from "../../services/alertService";
 import CountUp from 'react-countup';
+import { useAuth } from '../../contexts/AuthContext';
 
 const drawerWidth = 240;
 
@@ -114,6 +117,7 @@ const Dashboard = () => {
   
   const navigate = useNavigate();
   const location = useLocation();
+  const { user, logout: handleLogout } = useAuth();
 
   const fetchData = async () => {
     try {
@@ -228,12 +232,14 @@ const Dashboard = () => {
             width: drawerWidth,
             boxSizing: 'border-box',
             bgcolor: darkBlue,
-            color: 'white'
+            color: 'white',
+            display: 'flex',
+            flexDirection: 'column'
           },
         }}
         variant="permanent"
       >
-        <List>
+        <List sx={{ flex: 1 }}>
           {/* Back to Staff Dashboard */}
           <ListItem disablePadding sx={{ mb: 1 }}>
             <ListItemButton 
@@ -416,6 +422,36 @@ const Dashboard = () => {
             </ListItemButton>
           </ListItem>
         </List>
+
+        {/* User Profile Section */}
+        <Box sx={{ p: 2, borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+            <Avatar sx={{ bgcolor: 'primary.main' }}>
+              {user?.name?.charAt(0) || 'U'}
+            </Avatar>
+            <Box>
+              <Typography variant="subtitle1">{user?.name || 'User'}</Typography>
+              <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)' }}>
+                {user?.role || 'Staff'}
+              </Typography>
+            </Box>
+          </Box>
+          <ListItemButton
+            onClick={handleLogout}
+            sx={{
+              borderRadius: '12px',
+              color: 'error.light',
+              '&:hover': {
+                bgcolor: 'rgba(255,255,255,0.1)'
+              }
+            }}
+          >
+            <ListItemIcon sx={{ minWidth: 40, color: 'error.light' }}>
+              <ExitToApp />
+            </ListItemIcon>
+            <ListItemText primary="Logout" />
+          </ListItemButton>
+        </Box>
       </Drawer>
 
       {/* Main Content Area */}
@@ -440,11 +476,11 @@ const Dashboard = () => {
             Inventory
           </Typography>
           <Typography variant="subtitle1" sx={{ fontWeight: 400, textAlign: 'right' }}>
-            {getGreeting()}, Staff!
+            {getGreeting()}, {user?.name || 'Staff'}!
           </Typography>
         </Box>
 
-        {/* HERO SUMMARY SECTION */}
+        {/* SUMMARY SECTION */}
         <Box sx={{
           display: 'flex',
           flexDirection: 'column',
@@ -489,7 +525,7 @@ const Dashboard = () => {
               <Card sx={{ bgcolor: lightRed, py: 1, px: 0.5, borderRadius: 2, boxShadow: '0 1px 4px rgba(198,40,40,0.08)', textAlign: 'center', minHeight: 90 }}>
                 <CardContent sx={{ p: 1, '&:last-child': { pb: 1 } }}>
                   <Warning sx={{ color: errorRed, fontSize: 28, mb: 0.5 }} />
-                  <Typography variant="subtitle2" color="textPrimary">Expiring Soon</Typography>
+                  <Typography variant="subtitle2" color="textPrimary">Expiry Alerts</Typography>
                   <Typography variant="h5" sx={{ color: errorRed, fontWeight: 700, lineHeight: 1.1 }}>
                     <CountUp end={expiringSoon} duration={1.2} separator="," />
                   </Typography>

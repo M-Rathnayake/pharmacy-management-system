@@ -7,7 +7,6 @@ import {
   Grid,
   Chip,
   IconButton,
-  Tooltip,
   Button,
   Dialog,
   DialogTitle,
@@ -17,12 +16,6 @@ import {
   LinearProgress,
   Alert,
   Stack,
-  Divider,
-  TextField,
-  MenuItem,
-  Select,
-  FormControl,
-  InputLabel,
   Paper,
   Container,
   Table,
@@ -33,15 +26,14 @@ import {
   TableRow,
   TablePagination,
   Tabs,
-  Tab
+  Tab,
+  TextField,
+  InputAdornment
 } from '@mui/material';
 import {
   Warning as WarningIcon,
   CheckCircle as CheckCircleIcon,
-  Delete as DeleteIcon,
   Refresh as RefreshIcon,
-  FilterList as FilterListIcon,
-  Sort as SortIcon,
   LocalPharmacy as LocalPharmacyIcon,
   Timer as TimerIcon,
   Error as ErrorIcon,
@@ -57,6 +49,13 @@ import { useNavigate } from 'react-router-dom';
 // Extend dayjs with the relativeTime plugin
 dayjs.extend(relativeTime);
 
+// Color constants
+const primaryBlue = '#1a5cb3';
+const lightBlue = '#e6f2ff';
+const successGreen = '#2e7d32';
+const warningOrange = '#e65100';
+const errorRed = '#c62828';
+
 const AlertList = () => {
   const [alerts, setAlerts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -64,8 +63,6 @@ const AlertList = () => {
   const [resolveDialogOpen, setResolveDialogOpen] = useState(false);
   const [resolveAllDialogOpen, setResolveAllDialogOpen] = useState(false);
   const [alertToResolve, setAlertToResolve] = useState(null);
-  const [filterType, setFilterType] = useState('all');
-  const [sortBy, setSortBy] = useState('date');
   const [searchQuery, setSearchQuery] = useState('');
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
@@ -81,6 +78,7 @@ const AlertList = () => {
     try {
       const data = await getAlerts();
       setAlerts(data);
+      setError(null);
     } catch (error) {
       setError("Failed to fetch alerts: " + error.message);
     } finally {
@@ -100,7 +98,7 @@ const AlertList = () => {
   const handleConfirmResolve = async () => {
     try {
       await resolveAlert(alertToResolve._id);
-      await fetchAlerts(); // Refresh the list
+      await fetchAlerts();
       setError(null);
     } catch (error) {
       setError(error.message || "Failed to resolve alert. Please try again.");
@@ -143,19 +141,19 @@ const AlertList = () => {
 
   const handleTabChange = (event, newValue) => {
     setActiveTab(newValue);
-    setPage(0); // Reset to first page when changing tabs
+    setPage(0);
   };
 
   const getAlertIcon = (type) => {
     switch (type) {
       case 'low-stock':
-        return <LocalPharmacyIcon sx={{ color: '#e65100' }} />;
+        return <LocalPharmacyIcon sx={{ color: warningOrange }} />;
       case 'near-expiry':
-        return <TimerIcon sx={{ color: '#c62828' }} />;
+        return <TimerIcon sx={{ color: errorRed }} />;
       case 'expired':
-        return <ErrorIcon sx={{ color: '#d32f2f' }} />;
+        return <ErrorIcon sx={{ color: errorRed }} />;
       default:
-        return <WarningIcon sx={{ color: '#f57c00' }} />;
+        return <WarningIcon sx={{ color: warningOrange }} />;
     }
   };
 
@@ -172,38 +170,23 @@ const AlertList = () => {
     }
   };
 
-  const getAlertTextColor = (type) => {
-    switch (type) {
-      case 'low-stock':
-        return '#e65100';
-      case 'near-expiry':
-        return '#c62828';
-      case 'expired':
-        return '#d32f2f';
-      default:
-        return '#f57c00';
-    }
-  };
-
   const filteredAlerts = alerts
     .filter(alert => {
       // First filter by resolved status
       if (activeTab === 0 && alert.resolved) return false;
       if (activeTab === 1 && !alert.resolved) return false;
       
-      // Then apply type filter
-      const matchesType = filterType === 'all' || alert.type === filterType;
-      const matchesSearch = alert.message.toLowerCase().includes(searchQuery.toLowerCase());
-      return matchesType && matchesSearch;
+      // Then apply search filter
+      const searchLower = searchQuery.toLowerCase();
+      return (
+        alert.message.toLowerCase().includes(searchLower) ||
+        (alert.medicineId?.name || '').toLowerCase().includes(searchLower) ||
+        alert.type.toLowerCase().includes(searchLower)
+      );
     })
-    .sort((a, b) => {
-      if (sortBy === 'date') {
-        return new Date(b.createdAt) - new Date(a.createdAt);
-      }
-      return a.type.localeCompare(b.type);
-    });
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
-  // Calculate summary statistics for unresolved alerts only
+  // Calculate summary statistics
   const unresolvedAlerts = alerts.filter(alert => !alert.resolved);
   const totalAlerts = unresolvedAlerts.length;
   const lowStockAlerts = unresolvedAlerts.filter(alert => alert.type === 'low-stock').length;
@@ -231,15 +214,15 @@ const AlertList = () => {
           <IconButton 
             onClick={() => navigate('/inventory')}
             sx={{ 
-              color: '#1a5cb3',
+              color: primaryBlue,
               '&:hover': {
-                backgroundColor: '#e6f2ff'
+                backgroundColor: lightBlue
               }
             }}
           >
             <ArrowBack />
           </IconButton>
-          <Typography variant="h4" component="h2" sx={{ color: '#1a5cb3', fontWeight: 'bold' }}>
+          <Typography variant="h4" component="h2" sx={{ color: primaryBlue, fontWeight: 'bold' }}>
             Alerts
           </Typography>
         </Box>
@@ -251,18 +234,24 @@ const AlertList = () => {
               startIcon={<DoneAllIcon />}
               onClick={handleResolveAllClick}
               sx={{ 
-                bgcolor: '#4caf50',
-                '&:hover': { bgcolor: '#388e3c' }
+                bgcolor: successGreen,
+                '&:hover': { bgcolor: '#1b5e20' }
               }}
             >
               Resolve All
             </Button>
           )}
-          <Tooltip title="Refresh alerts">
-            <IconButton onClick={fetchAlerts}>
-              <RefreshIcon />
-            </IconButton>
-          </Tooltip>
+          <IconButton 
+            onClick={fetchAlerts}
+            sx={{ 
+              color: primaryBlue,
+              '&:hover': {
+                backgroundColor: lightBlue
+              }
+            }}
+          >
+            <RefreshIcon />
+          </IconButton>
         </Box>
       </Box>
 
@@ -272,6 +261,42 @@ const AlertList = () => {
         </Alert>
       )}
 
+      {/* Summary Cards */}
+      <Grid container spacing={2} sx={{ mb: 3 }}>
+        <Grid item xs={12} sm={6} md={3}>
+          <Card sx={{ bgcolor: lightBlue }}>
+            <CardContent>
+              <Typography variant="h6" color={primaryBlue}>Total Alerts</Typography>
+              <Typography variant="h4">{totalAlerts}</Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+        <Grid item xs={12} sm={6} md={3}>
+          <Card sx={{ bgcolor: '#fff3e0' }}>
+            <CardContent>
+              <Typography variant="h6" color={warningOrange}>Low Stock</Typography>
+              <Typography variant="h4">{lowStockAlerts}</Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+        <Grid item xs={12} sm={6} md={3}>
+          <Card sx={{ bgcolor: '#ffebee' }}>
+            <CardContent>
+              <Typography variant="h6" color={errorRed}>Expiring Soon</Typography>
+              <Typography variant="h4">{expiringAlerts}</Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+        <Grid item xs={12} sm={6} md={3}>
+          <Card sx={{ bgcolor: '#ffcdd2' }}>
+            <CardContent>
+              <Typography variant="h6" color={errorRed}>Expired</Typography>
+              <Typography variant="h4">{expiredAlerts}</Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+      </Grid>
+
       {/* Tabs */}
       <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>
         <Tabs value={activeTab} onChange={handleTabChange}>
@@ -280,39 +305,29 @@ const AlertList = () => {
         </Tabs>
       </Box>
 
-      {/* Filters */}
-      <Box sx={{ mb: 2, display: 'flex', gap: 2, alignItems: 'center' }}>
-        <FormControl sx={{ minWidth: 120 }}>
-          <InputLabel>Filter Type</InputLabel>
-          <Select
-            value={filterType}
-            label="Filter Type"
-            onChange={(e) => setFilterType(e.target.value)}
-          >
-            <MenuItem value="all">All Types</MenuItem>
-            <MenuItem value="low-stock">Low Stock</MenuItem>
-            <MenuItem value="near-expiry">Near Expiry</MenuItem>
-            <MenuItem value="expired">Expired</MenuItem>
-          </Select>
-        </FormControl>
-
+      {/* Search Bar */}
+      <Box sx={{ mb: 2 }}>
         <TextField
-          label="Search"
+          fullWidth
           variant="outlined"
-          size="small"
+          placeholder="Search alerts..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           InputProps={{
-            startAdornment: <SearchIcon sx={{ mr: 1, color: 'text.secondary' }} />
+            startAdornment: (
+              <InputAdornment position="start">
+                <SearchIcon />
+              </InputAdornment>
+            ),
           }}
         />
       </Box>
 
       {/* Alerts Table */}
-      <TableContainer component={Paper}>
+      <TableContainer component={Paper} sx={{ boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
         <Table>
           <TableHead>
-            <TableRow>
+            <TableRow sx={{ bgcolor: lightBlue }}>
               <TableCell>Type</TableCell>
               <TableCell>Medicine</TableCell>
               <TableCell>Message</TableCell>
@@ -326,7 +341,15 @@ const AlertList = () => {
               filteredAlerts
                 .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
                 .map((alert) => (
-                  <TableRow key={alert._id}>
+                  <TableRow 
+                    key={alert._id}
+                    sx={{ 
+                      '&:hover': { 
+                        backgroundColor: getAlertColor(alert.type),
+                        opacity: 0.8
+                      }
+                    }}
+                  >
                     <TableCell>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                         {getAlertIcon(alert.type)}
@@ -358,6 +381,7 @@ const AlertList = () => {
                           onClick={() => handleResolveClick(alert)}
                           color="success"
                           size="small"
+                          variant="outlined"
                         >
                           Resolve
                         </Button>
@@ -367,7 +391,7 @@ const AlertList = () => {
                 ))
             ) : (
               <TableRow>
-                <TableCell colSpan={6} align="center">
+                <TableCell colSpan={6} align="center" sx={{ py: 3 }}>
                   <Typography variant="body1" color="textSecondary">
                     No alerts found
                   </Typography>
@@ -400,7 +424,12 @@ const AlertList = () => {
         </DialogContent>
         <DialogActions>
           <Button onClick={handleCloseResolveDialog}>Cancel</Button>
-          <Button onClick={handleConfirmResolve} color="success" autoFocus>
+          <Button 
+            onClick={handleConfirmResolve} 
+            color="success" 
+            variant="contained"
+            autoFocus
+          >
             Resolve
           </Button>
         </DialogActions>
@@ -419,7 +448,12 @@ const AlertList = () => {
         </DialogContent>
         <DialogActions>
           <Button onClick={handleCloseResolveAllDialog}>Cancel</Button>
-          <Button onClick={handleConfirmResolveAll} color="success" autoFocus>
+          <Button 
+            onClick={handleConfirmResolveAll} 
+            color="success" 
+            variant="contained"
+            autoFocus
+          >
             Resolve All
           </Button>
         </DialogActions>
