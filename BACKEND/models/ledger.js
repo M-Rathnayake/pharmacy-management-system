@@ -4,32 +4,23 @@ const ledgerSchema = new mongoose.Schema({
   accountName: {
     type: String,
     required: [true, 'Account name is required'],
-    trim: true,
-    maxlength: [100, 'Account name cannot exceed 100 characters']
+    trim: true
   },
   accountCode: {
     type: String,
     required: [true, 'Account code is required'],
     trim: true,
-    match: [/^[A-Z0-9-]+$/, 'Account code can only contain uppercase letters, numbers and hyphens']
+    validate: {
+      validator: function(v) {
+        return /^[A-Z]{3,4}\d{3}$/.test(v);
+      },
+      message: props => 'Account code must be in format: 3-4 uppercase letters followed by 3 numbers (e.g., CASH001)'
+    }
   },
   accountType: {
     type: String,
     required: [true, 'Account type is required'],
-    enum: {
-      values: ['asset', 'liability', 'equity', 'revenue', 'expense'],
-      message: 'Account type must be asset, liability, equity, revenue, or expense'
-    }
-  },
-  subAccountType: {
-    type: String,
-    required: function() {
-      return this.accountType === 'asset' || this.accountType === 'liability';
-    },
-    enum: {
-      values: ['current', 'non-current', null],
-      message: 'Sub-account type must be current or non-current'
-    }
+    enum: ['asset', 'liability', 'equity', 'revenue', 'expense']
   },
   openingBalance: {
     type: Number,
@@ -39,10 +30,7 @@ const ledgerSchema = new mongoose.Schema({
   balanceType: {
     type: String,
     required: [true, 'Balance type is required'],
-    enum: {
-      values: ['debit', 'credit'],
-      message: 'Balance type must be debit or credit'
-    }
+    enum: ['debit', 'credit']
   },
   isActive: {
     type: Boolean,
@@ -54,29 +42,21 @@ const ledgerSchema = new mongoose.Schema({
   },
   taxRate: {
     type: Number,
-    min: [0, 'Tax rate cannot be negative'],
-    max: [100, 'Tax rate cannot exceed 100%'],
-    required: function() {
-      return this.taxApplicable === true;
-    }
+    default: 0
   },
   reconciliationFrequency: {
     type: String,
-    enum: {
-      values: ['daily', 'weekly', 'monthly', 'quarterly', 'annually', 'never'],
-      message: 'Invalid reconciliation frequency'
-    },
-    default: 'monthly'
+    default: 'monthly',
+    enum: ['daily', 'weekly', 'monthly', 'quarterly', 'annually', 'never']
   },
   notes: {
     type: String,
-    trim: true,
-    maxlength: [500, 'Notes cannot exceed 500 characters']
+    trim: true
   },
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: true
+    required: false
   }
 }, {
   timestamps: true,
@@ -84,16 +64,31 @@ const ledgerSchema = new mongoose.Schema({
   toObject: { virtuals: true }
 });
 
-// Virtual for current balance (would need to be calculated based on transactions)
+// Virtual for current balance
 ledgerSchema.virtual('currentBalance').get(function() {
-  // In a real implementation, this would calculate based on transactions
   return this.openingBalance;
 });
 
-// Indexes for frequently queried fields
+// Pre-save middleware to ensure account code is uppercase
+ledgerSchema.pre('save', function(next) {
+  if (this.accountCode) {
+    this.accountCode = this.accountCode.toUpperCase();
+  }
+  next();
+});
+
+// Create indexes
 ledgerSchema.index({ accountName: 1 });
-ledgerSchema.index({ accountCode: 1 }, { unique: true });
 ledgerSchema.index({ accountType: 1 });
 ledgerSchema.index({ isActive: 1 });
+ledgerSchema.index(
+  { accountCode: 1 },
+  {
+    unique: true,
+    partialFilterExpression: {
+      accountCode: { $type: "string" }
+    }
+  }
+);
 
 module.exports = mongoose.model('Ledger', ledgerSchema);

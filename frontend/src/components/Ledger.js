@@ -44,7 +44,6 @@ const LedgerForm = () => {
     accountName: "",
     accountCode: "",
     accountType: "",
-    subAccountType: "",
     openingBalance: 0,
     balanceType: "debit",
     isActive: true,
@@ -62,9 +61,8 @@ const LedgerForm = () => {
   const [expandedAccounts, setExpandedAccounts] = useState({});
   const [isLoading, setIsLoading] = useState(false);
 
-  // Account types and sub-types
+  // Account types
   const accountTypes = ['asset', 'liability', 'equity', 'revenue', 'expense'];
-  const subAccountTypes = ['current', 'non-current'];
   const reconciliationFrequencies = ['daily', 'weekly', 'monthly', 'quarterly', 'annually', 'never'];
 
   useEffect(() => {
@@ -96,12 +94,22 @@ const LedgerForm = () => {
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
+    
+    // Special handling for account code
+    if (name === 'accountCode') {
+      // Convert to uppercase and remove any invalid characters
+      const formattedValue = value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+      setFormData(prev => ({
+        ...prev,
+        [name]: formattedValue
+      }));
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        [name]: value
+      }));
+    }
 
-    // Clear error when user starts typing
     if (errors[name]) {
       setErrors(prev => ({
         ...prev,
@@ -123,18 +131,12 @@ const LedgerForm = () => {
     
     if (!formData.accountName) formErrors.accountName = "Account name is required";
     if (!formData.accountCode) formErrors.accountCode = "Account code is required";
+    if (formData.accountCode && !/^[A-Z]{3,4}\d{3}$/.test(formData.accountCode)) {
+      formErrors.accountCode = "Account code must be in format: 3-4 uppercase letters followed by 3 numbers (e.g., CASH001)";
+    }
     if (!formData.accountType) formErrors.accountType = "Account type is required";
+    if (!formData.openingBalance && formData.openingBalance !== 0) formErrors.openingBalance = "Opening balance is required";
     
-    // Conditional validation for sub-account type
-    if ((formData.accountType === 'asset' || formData.accountType === 'liability') && !formData.subAccountType) {
-      formErrors.subAccountType = "Sub-account type is required for assets and liabilities";
-    }
-    
-    // Conditional validation for tax rate
-    if (formData.taxApplicable && (!formData.taxRate || formData.taxRate <= 0)) {
-      formErrors.taxRate = "Tax rate must be greater than 0 when tax is applicable";
-    }
-
     setErrors(formErrors);
     return Object.keys(formErrors).length === 0;
   };
@@ -165,7 +167,17 @@ const LedgerForm = () => {
       await fetchLedgerData();
     } catch (error) {
       const errorMessage = error.response?.data?.error || "Error submitting data. Please try again.";
-      showAlert(errorMessage, "error");
+      const errorDetails = error.response?.data?.details;
+      
+      if (errorDetails) {
+        if (Array.isArray(errorDetails)) {
+          showAlert(errorDetails.join(", "), "error");
+        } else {
+          showAlert(`${errorMessage}: ${errorDetails}`, "error");
+        }
+      } else {
+        showAlert(errorMessage, "error");
+      }
     } finally {
       setIsLoading(false);
     }
@@ -178,7 +190,6 @@ const LedgerForm = () => {
         accountName: data.accountName,
         accountCode: data.accountCode,
         accountType: data.accountType,
-        subAccountType: data.subAccountType || "",
         openingBalance: data.openingBalance,
         balanceType: data.balanceType,
         isActive: data.isActive,
@@ -225,7 +236,6 @@ const LedgerForm = () => {
       accountName: "",
       accountCode: "",
       accountType: "",
-      subAccountType: "",
       openingBalance: 0,
       balanceType: "debit",
       isActive: true,
@@ -261,7 +271,7 @@ const LedgerForm = () => {
           Manage your chart of accounts
         </Typography>
       </Box>
-      
+
       <Snackbar 
         open={alertMsg.open} 
         autoHideDuration={6000} 
@@ -317,13 +327,15 @@ const LedgerForm = () => {
               value={formData.accountCode}
               onChange={handleInputChange}
               error={Boolean(errors.accountCode)}
-              helperText={errors.accountCode}
+              helperText={errors.accountCode || "Format: 3-4 uppercase letters followed by 3 numbers (e.g., CASH001)"}
               required
-              disabled={isLoading || isEditing} // Disable editing of account code
+              disabled={isLoading || isEditing}
               inputProps={{
-                pattern: "^[A-Z0-9-]+$",
-                title: "Uppercase letters, numbers and hyphens only"
+                maxLength: 7,
+                pattern: "^[A-Z]{3,4}\\d{3}$",
+                title: "3-4 uppercase letters followed by 3 numbers (e.g., CASH001)"
               }}
+              placeholder="e.g., CASH001"
             />
           </Grid>
 
@@ -346,28 +358,6 @@ const LedgerForm = () => {
               </Select>
               {errors.accountType && (
                 <Typography color="error" variant="caption">{errors.accountType}</Typography>
-              )}
-            </FormControl>
-          </Grid>
-
-          <Grid item xs={12} md={6}>
-            <FormControl fullWidth error={Boolean(errors.subAccountType)}>
-              <InputLabel>Sub-Account Type</InputLabel>
-              <Select
-                name="subAccountType"
-                value={formData.subAccountType}
-                onChange={handleInputChange}
-                label="Sub-Account Type"
-                disabled={isLoading || !['asset', 'liability'].includes(formData.accountType)}
-              >
-                {subAccountTypes.map(type => (
-                  <MenuItem key={type} value={type}>
-                    {type.charAt(0).toUpperCase() + type.slice(1)}
-                  </MenuItem>
-                ))}
-              </Select>
-              {errors.subAccountType && (
-                <Typography color="error" variant="caption">{errors.subAccountType}</Typography>
               )}
             </FormControl>
           </Grid>
@@ -396,16 +386,16 @@ const LedgerForm = () => {
                 value={formData.balanceType}
                 onChange={handleInputChange}
               >
-                <FormControlLabel 
-                  value="debit" 
-                  control={<Radio />} 
-                  label="Debit" 
+                <FormControlLabel
+                  value="debit"
+                  control={<Radio />}
+                  label="Debit"
                   disabled={isLoading}
                 />
-                <FormControlLabel 
-                  value="credit" 
-                  control={<Radio />} 
-                  label="Credit" 
+                <FormControlLabel
+                  value="credit"
+                  control={<Radio />}
+                  label="Credit"
                   disabled={isLoading}
                 />
               </RadioGroup>
@@ -457,8 +447,6 @@ const LedgerForm = () => {
                 value={formData.taxRate}
                 onChange={handleInputChange}
                 inputProps={{ min: 0, max: 100, step: 0.01 }}
-                error={Boolean(errors.taxRate)}
-                helperText={errors.taxRate}
                 disabled={isLoading || !formData.taxApplicable}
               />
             </Grid>
@@ -479,9 +467,9 @@ const LedgerForm = () => {
 
           <Grid item xs={12}>
             <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
-              <Button 
-                type="submit" 
-                variant="contained" 
+              <Button
+                type="submit"
+                variant="contained"
                 color="primary"
                 disabled={isLoading}
                 startIcon={isLoading ? <CircularProgress size={20} color="inherit" /> : null}
@@ -489,8 +477,8 @@ const LedgerForm = () => {
                 {isLoading ? "Processing..." : (isEditing ? "Update Account" : "Add Account")}
               </Button>
               {isEditing && (
-                <Button 
-                  variant="outlined" 
+                <Button
+                  variant="outlined"
                   onClick={() => {
                     setIsEditing(false);
                     setEditingId(null);
@@ -560,14 +548,6 @@ const LedgerForm = () => {
                             }
                             size="small"
                           />
-                          {account.subAccountType && (
-                            <Chip 
-                              label={account.subAccountType.toUpperCase()}
-                              variant="outlined"
-                              size="small"
-                              sx={{ ml: 1 }}
-                            />
-                          )}
                         </TableCell>
                         <TableCell>
                           <Chip 
@@ -587,7 +567,7 @@ const LedgerForm = () => {
                           />
                         </TableCell>
                         <TableCell>
-                          <IconButton 
+                          <IconButton
                             onClick={(e) => {
                               e.stopPropagation();
                               handleEdit(account._id);
@@ -598,18 +578,7 @@ const LedgerForm = () => {
                           >
                             <EditIcon />
                           </IconButton>
-                          <IconButton 
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              toggleStatus(account._id);
-                            }}
-                            color={account.isActive ? 'warning' : 'success'}
-                            sx={{ '&:hover': { backgroundColor: '#fff8e1' } }}
-                            disabled={isLoading}
-                          >
-                            {account.isActive ? '🚫' : '✅'}
-                          </IconButton>
-                          <IconButton 
+                          <IconButton
                             onClick={(e) => {
                               e.stopPropagation();
                               handleDelete(account._id);
@@ -675,21 +644,33 @@ const LedgerForm = () => {
       )}
 
       {ledgerData.length > 0 && (
-        <Box mt={4} sx={{ display: 'flex', justifyContent: 'flex-end' }}>
-          <DownloadPDFButton 
-            documentType="ledger" 
-            data={ledgerData} 
+        <Paper elevation={3} sx={{ p: 3, mt: 4, borderRadius: 2 }}>
+          <Typography
+            variant="h6"
+            sx={{
+              color: '#3998ff',
+              fontWeight: 'bold',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1,
+              mb: 2,
+            }}
+          >
+            🖨️ Export Ledger Accounts
+          </Typography>
+          <DownloadPDFButton
+            documentType="ledger"
+            data={ledgerData}
             fileName="ledger_accounts.pdf"
             sx={{
               backgroundColor: '#3998ff',
               color: 'white',
               '&:hover': {
-                backgroundColor: '#2979ff'
-              }
+                backgroundColor: '#2979ff',
+              },
             }}
-            disabled={isLoading}
           />
-        </Box>
+        </Paper>
       )}
     </Container>
   );

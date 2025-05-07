@@ -1,31 +1,43 @@
 const { body, validationResult } = require('express-validator');
-const Ledger = require("../models/ledger");
+const Ledger = require("../models/Ledger");
+const mongoose = require('mongoose');
 
 const validateLedgerEntry = [
   body('accountName')
     .notEmpty().withMessage('Account name is required')
-    .trim()
-    .isLength({ max: 50 }).withMessage('Account name cannot exceed 50 characters'),
+    .trim(),
   
   body('accountCode')
     .notEmpty().withMessage('Account code is required')
     .trim()
-    .matches(/^[A-Z0-9-]+$/).withMessage('Account code can only contain uppercase letters, numbers and hyphens'),
+    .custom(value => {
+      if (!value) {
+        throw new Error('Account code is required');
+      }
+      if (!/^[A-Z]{3,4}\d{3}$/.test(value)) {
+        throw new Error('Account code must be in format: 3-4 uppercase letters followed by 3 numbers (e.g., CASH001)');
+      }
+      return true;
+    })
+    .custom(async (value) => {
+      if (!value) return true; // Skip if empty (will be caught by previous validation)
+      const existingLedger = await Ledger.findOne({ accountCode: value.toUpperCase() });
+      if (existingLedger) {
+        throw new Error('Account code already exists');
+      }
+      return true;
+    }),
   
   body('accountType')
     .notEmpty().withMessage('Account type is required')
-    .isIn(['asset', 'liability', 'equity', 'revenue', 'expense']).withMessage('Invalid account type'),
-  
-  body('subAccountType')
-    .optional()
-    .isIn(['current', 'non-current', null]).withMessage('Invalid sub-account type'),
+    .isIn(['asset', 'liability', 'equity', 'revenue', 'expense']),
   
   body('openingBalance')
     .isFloat().withMessage('Opening balance must be a number'),
   
   body('balanceType')
     .notEmpty().withMessage('Balance type is required')
-    .isIn(['debit', 'credit']).withMessage('Balance type must be debit or credit'),
+    .isIn(['debit', 'credit']),
   
   body('taxApplicable')
     .optional()
@@ -37,21 +49,24 @@ const validateLedgerEntry = [
   
   body('reconciliationFrequency')
     .optional()
-    .isIn(['daily', 'weekly', 'monthly', 'quarterly', 'annually', 'never']).withMessage('Invalid reconciliation frequency'),
+    .isIn(['daily', 'weekly', 'monthly', 'quarterly', 'annually', 'never'])
+    .withMessage('Invalid reconciliation frequency'),
   
   (req, res, next) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      return res.status(400).json({ errors: errors.array() });
+      return res.status(400).json({ 
+        error: "Validation Error",
+        details: errors.array().map(err => err.msg)
+      });
     }
     
     // Additional validation for conditional fields
     if (req.body.taxApplicable === true && (req.body.taxRate === undefined || req.body.taxRate === null)) {
-      return res.status(400).json({ errors: [{ msg: 'Tax rate is required when tax is applicable' }] });
-    }
-    
-    if ((req.body.accountType === 'asset' || req.body.accountType === 'liability') && !req.body.subAccountType) {
-      return res.status(400).json({ errors: [{ msg: 'Sub-account type is required for assets and liabilities' }] });
+      return res.status(400).json({ 
+        error: "Validation Error",
+        details: ['Tax rate is required when tax is applicable']
+      });
     }
     
     next();
@@ -60,126 +75,116 @@ const validateLedgerEntry = [
 
 const getLedgers = async (req, res) => {
   try {
-    const { type, active } = req.query;
-    const query = {};
-    
-    if (type) query.accountType = type;
-    if (active) query.isActive = active === 'true';
-    
-    const data = await Ledger.find(query)
-      .sort({ accountName: 1 })
-      .populate('createdBy', 'name email');
-      
-    res.status(200).json(data);
+    const ledgers = await Ledger.find();
+    res.json(ledgers);
   } catch (error) {
-    res.status(500).json({ error: "Failed to fetch ledger accounts" });
+    res.status(500).json({ message: error.message });
   }
 };
 
-const getLedgerById = async (req, res) => {
+const getLedger = async (req, res) => {
   try {
-    const { id } = req.params;
-    const ledger = await Ledger.findById(id).populate('createdBy', 'name email');
-    
+    const ledger = await Ledger.findById(req.params.id);
     if (!ledger) {
-      return res.status(404).json({ error: "Ledger account not found" });
+      return res.status(404).json({ message: 'Ledger not found' });
     }
-    
-    res.status(200).json(ledger);
+    res.json(ledger);
   } catch (error) {
-    res.status(500).json({ error: "Failed to fetch ledger account" });
+    res.status(500).json({ message: error.message });
   }
 };
 
 const addLedger = async (req, res) => {
   try {
-    const { accountName, accountCode, accountType, subAccountType, openingBalance, balanceType } = req.body;
-    
+    const { accountName, accountCode, accountType, openingBalance, balanceType } = req.body;
+
+    // Basic validation
+    if (!accountName || !accountCode || !accountType || openingBalance === undefined || !balanceType) {
+      return res.status(400).json({
+        error: "Validation Error",
+        details: ["All required fields must be provided"]
+      });
+    }
+
+    // Format account code to uppercase
+    const formattedAccountCode = accountCode.toUpperCase();
+
     // Check for duplicate account code
-    const existingLedger = await Ledger.findOne({ accountCode });
+    const existingLedger = await Ledger.findOne({ accountCode: formattedAccountCode });
     if (existingLedger) {
-      return res.status(400).json({ error: "Account with this code already exists" });
+      return res.status(400).json({
+        error: "Duplicate Error",
+        details: ["An account with this code already exists"]
+      });
     }
-    
-    const newLedger = new Ledger({
-      ...req.body,
-      createdBy: req.user.id // Assuming you have user authentication
+
+    // Create new ledger with default values for optional fields
+    const ledger = new Ledger({
+      accountName,
+      accountCode: formattedAccountCode,
+      accountType,
+      openingBalance,
+      balanceType,
+      isActive: true,
+      taxApplicable: false,
+      taxRate: 0,
+      reconciliationFrequency: 'monthly'
     });
-    
-    const savedLedger = await newLedger.save();
-    res.status(201).json(savedLedger);
+
+    const newLedger = await ledger.save();
+    res.status(201).json(newLedger);
   } catch (error) {
-    if (error.code === 11000) {
-      return res.status(400).json({ error: "Account with this name or code already exists" });
+    if (error.name === 'ValidationError') {
+      return res.status(400).json({
+        error: "Validation Error",
+        details: Object.values(error.errors).map(err => err.message)
+      });
     }
-    res.status(500).json({ error: "Failed to create new ledger account" });
+    res.status(500).json({ message: error.message });
   }
 };
 
 const updateLedger = async (req, res) => {
   try {
-    const { id } = req.params;
-    
-    // Prevent changing account code
-    if (req.body.accountCode) {
-      return res.status(400).json({ error: "Account code cannot be changed" });
-    }
-    
-    const updatedLedger = await Ledger.findByIdAndUpdate(
-      id,
-      req.body,
-      { new: true, runValidators: true }
-    );
-    
-    if (!updatedLedger) {
-      return res.status(404).json({ error: "Ledger account not found" });
-    }
-    
-    res.status(200).json(updatedLedger);
-  } catch (error) {
-    res.status(500).json({ error: "Failed to update ledger account" });
-  }
-};
-
-const toggleLedgerStatus = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const ledger = await Ledger.findById(id);
-    
+    const ledger = await Ledger.findById(req.params.id);
     if (!ledger) {
-      return res.status(404).json({ error: "Ledger account not found" });
+      return res.status(404).json({ message: 'Ledger not found' });
     }
-    
-    ledger.isActive = !ledger.isActive;
+
+    // Update only provided fields
+    Object.keys(req.body).forEach(key => {
+      if (key === 'accountCode') {
+        ledger[key] = req.body[key].toUpperCase();
+      } else {
+        ledger[key] = req.body[key];
+      }
+    });
+
     const updatedLedger = await ledger.save();
-    
-    res.status(200).json(updatedLedger);
+    res.json(updatedLedger);
   } catch (error) {
-    res.status(500).json({ error: "Failed to toggle ledger status" });
+    res.status(400).json({ message: error.message });
   }
 };
 
 const deleteLedger = async (req, res) => {
   try {
-    const { id } = req.params;
-    const deletedLedger = await Ledger.findByIdAndDelete(id);
-    
-    if (!deletedLedger) {
-      return res.status(404).json({ error: "Ledger account not found" });
+    const ledger = await Ledger.findById(req.params.id);
+    if (!ledger) {
+      return res.status(404).json({ message: 'Ledger not found' });
     }
-    
-    res.status(200).json({ message: "Ledger account deleted successfully" });
+    await ledger.deleteOne();
+    res.json({ message: 'Ledger deleted' });
   } catch (error) {
-    res.status(500).json({ error: "Failed to delete ledger account" });
+    res.status(500).json({ message: error.message });
   }
 };
 
 module.exports = {
   validateLedgerEntry,
   getLedgers,
-  getLedgerById,
+  getLedger,
   addLedger,
   updateLedger,
-  toggleLedgerStatus,
   deleteLedger
 };

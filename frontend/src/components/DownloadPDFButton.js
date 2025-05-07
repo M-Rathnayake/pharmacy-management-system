@@ -25,7 +25,10 @@ const DownloadPDFButton = ({ documentType, data, fileName, sx }) => {
       // Add title
       doc.setFontSize(14);
       doc.setTextColor(0, 0, 0); // Black
-      doc.text(`${documentType === 'profit-loss' ? 'Profit & Loss Statement' : 'Balance Sheet'} Report`, 14, 30);
+      doc.text(`${documentType === 'profit-loss' ? 'Profit & Loss Statement' : 
+                documentType === 'balance-sheet' ? 'Balance Sheet' : 
+                documentType === 'ledger' ? 'Ledger Accounts' : 
+                documentType} Report`, 14, 30);
 
       // Add line separator
       doc.setDrawColor(57, 152, 255); // #3998ff
@@ -42,30 +45,12 @@ const DownloadPDFButton = ({ documentType, data, fileName, sx }) => {
           { header: 'Net Profit (Rs.)', dataKey: 'net_Profit' }
         ];
 
-        rows = data.map((item) => {
-          // Validate item
-          if (
-            !item.period ||
-            typeof item.revenue !== 'number' ||
-            typeof item.expenses !== 'number' ||
-            typeof item.profit !== 'number'
-          ) {
-            console.warn('Invalid data item:', item);
-            return {
-              period: item.period || 'N/A',
-              revenue: (typeof item.revenue === 'number' ? item.revenue : 0).toLocaleString('en-IN'),
-              expenses: (typeof item.expenses === 'number' ? item.expenses : 0).toLocaleString('en-IN'),
-              net_Profit: (typeof item.profit === 'number' ? item.profit : 0).toLocaleString('en-IN'),
-            };
-          }
-
-          return {
-            period: item.period,
-            revenue: item.revenue.toLocaleString('en-IN'),
-            expenses: item.expenses.toLocaleString('en-IN'),
-            net_Profit: item.profit.toLocaleString('en-IN'),
-          };
-        });
+        rows = data.map((item) => ({
+          period: item.period || 'N/A',
+          revenue: (item.revenue || 0).toLocaleString('en-IN'),
+          expenses: (item.expenses || 0).toLocaleString('en-IN'),
+          net_Profit: (item.profit || 0).toLocaleString('en-IN'),
+        }));
       } else if (documentType === 'balance-sheet') {
         columns = [
           { header: 'Period', dataKey: 'period' },
@@ -91,6 +76,24 @@ const DownloadPDFButton = ({ documentType, data, fileName, sx }) => {
             status: isBalanced ? 'Balanced' : 'Imbalanced'
           };
         });
+      } else if (documentType === 'ledger') {
+        columns = [
+          { header: 'Account Code', dataKey: 'accountCode' },
+          { header: 'Account Name', dataKey: 'accountName' },
+          { header: 'Type', dataKey: 'accountType' },
+          { header: 'Opening Balance (Rs.)', dataKey: 'openingBalance' },
+          { header: 'Balance Type', dataKey: 'balanceType' },
+          { header: 'Status', dataKey: 'isActive' }
+        ];
+
+        rows = data.map((item) => ({
+          accountCode: item.accountCode || 'N/A',
+          accountName: item.accountName || 'N/A',
+          accountType: item.accountType ? item.accountType.charAt(0).toUpperCase() + item.accountType.slice(1) : 'N/A',
+          openingBalance: (item.openingBalance || 0).toLocaleString('en-IN'),
+          balanceType: item.balanceType ? item.balanceType.charAt(0).toUpperCase() + item.balanceType.slice(1) : 'N/A',
+          isActive: item.isActive ? 'Active' : 'Inactive'
+        }));
       }
 
       // Add table
@@ -112,12 +115,12 @@ const DownloadPDFButton = ({ documentType, data, fileName, sx }) => {
           overflow: 'linebreak',
         },
         columnStyles: {
-          0: { cellWidth: 'auto' }, // Period
-          1: { cellWidth: 'auto' }, // Date
-          2: { cellWidth: 'auto', halign: 'right' }, // Assets
-          3: { cellWidth: 'auto', halign: 'right' }, // Liabilities
-          4: { cellWidth: 'auto', halign: 'right' }, // Equity
-          5: { cellWidth: 'auto', halign: 'center' } // Status
+          0: { cellWidth: 'auto' }, // First column
+          1: { cellWidth: 'auto' }, // Second column
+          2: { cellWidth: 'auto' }, // Third column
+          3: { cellWidth: 'auto', halign: 'right' }, // Amount columns
+          4: { cellWidth: 'auto' }, // Balance Type/Status
+          5: { cellWidth: 'auto' } // Last column
         },
       });
 
@@ -152,8 +155,8 @@ const DownloadPDFButton = ({ documentType, data, fileName, sx }) => {
         doc.save(sanitizedFileName);
       }
     } catch (error) {
-      console.error('Error generating PDF:', error.message, error.stack);
-      alert(`Failed to generate PDF: ${error.message}`);
+      console.error('Error generating PDF:', error);
+      alert('Failed to generate PDF: ' + error.message);
     }
   };
 
@@ -161,27 +164,17 @@ const DownloadPDFButton = ({ documentType, data, fileName, sx }) => {
     <Box sx={{ display: 'flex', gap: 2 }}>
       <Button
         variant="contained"
-        onClick={() => handleDownload(false)}
         startIcon={<Download />}
-        sx={{
-          backgroundColor: '#3998ff',
-          color: 'white',
-          '&:hover': { backgroundColor: '#2979ff' },
-          ...sx,
-        }}
+        onClick={() => handleDownload(false)}
+        sx={sx}
       >
         Download PDF
       </Button>
       <Button
         variant="outlined"
-        onClick={() => handleDownload(true)}
         startIcon={<Visibility />}
-        sx={{
-          borderColor: '#3998ff',
-          color: '#3998ff',
-          '&:hover': { borderColor: '#2979ff', color: '#2979ff' },
-          backgroundColor: 'white',
-        }}
+        onClick={() => handleDownload(true)}
+        sx={sx}
       >
         View PDF
       </Button>
