@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const { getSalaries, addSalary, updateSalary, deleteSalary } = require("../controllers/salaryControl");
+const salaryController = require("../controllers/SalaryControl");
 
 // Debug middleware for all salary routes
 router.use((req, res, next) => {
@@ -11,32 +11,16 @@ router.use((req, res, next) => {
 });
 
 // Get all salary records
-router.get("/", (req, res, next) => {
-    console.log('[Salary Routes] GET / - Fetching all salaries');
-    getSalaries(req, res, next);
-});
+router.get("/", salaryController.getSalaries);
 
-// Add a new salary record
-router.post("/", (req, res, next) => {
-    console.log('[Salary Routes] POST / - Adding new salary');
-    console.log('Request Body:', req.body);
-    addSalary(req, res, next);
-});
+// Create a new salary record
+router.post("/", salaryController.addSalary);
 
 // Update a salary record
-router.put("/:id", (req, res, next) => {
-    console.log('[Salary Routes] PUT /:id - Updating salary');
-    console.log('Salary ID:', req.params.id);
-    console.log('Request Body:', req.body);
-    updateSalary(req, res, next);
-});
+router.put("/:id", salaryController.updateSalary);
 
 // Delete a salary record
-router.delete("/:id", (req, res, next) => {
-    console.log('[Salary Routes] DELETE /:id - Deleting salary');
-    console.log('Salary ID:', req.params.id);
-    deleteSalary(req, res, next);
-});
+router.delete("/:id", salaryController.deleteSalary);
 
 // Error handling middleware
 router.use((err, req, res, next) => {

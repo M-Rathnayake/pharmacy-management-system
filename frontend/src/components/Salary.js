@@ -52,19 +52,60 @@ const SalaryForm = () => {
   const fetchSalaryData = async () => {
     try {
       setIsLoading(true);
-      console.log('Fetching salary data from:', "http://localhost:8080/api/salaries");
+      console.log('Fetching salary data...');
       const response = await axios.get("http://localhost:8080/api/salaries");
-      console.log('Salary data received:', response.data);
+      console.log('Raw salary data received:', response.data);
       
-      if (!Array.isArray(response.data)) {
-        throw new Error('Invalid response format from server');
+      if (!response.data) {
+        throw new Error('No data received from server');
       }
 
-      setSalaryData(response.data);
+      // Ensure we have an array of salary records
+      const salaryRecords = Array.isArray(response.data) ? response.data : [response.data];
+      console.log('Processed salary records:', salaryRecords);
+
+      // Validate each record has required fields
+      const validRecords = salaryRecords.filter(record => {
+        const isValid = record && 
+          record.employee_id && 
+          record.month && 
+          typeof record.basicSalary === 'number' &&
+          typeof record.net_salary === 'number';
+        
+        if (!isValid) {
+          console.warn('Invalid salary record:', record);
+        }
+        return isValid;
+      });
+
+      // Map the records to include employee details
+      const recordsWithEmployeeDetails = validRecords.map(record => {
+        const employee = employees.find(emp => emp.employee_id === record.employee_id);
+        return {
+          ...record,
+          employeeDetails: employee || null
+        };
+      });
+
+      console.log('Valid salary records with employee details:', recordsWithEmployeeDetails);
+      setSalaryData(recordsWithEmployeeDetails);
     } catch (error) {
-      console.error("Error fetching salary data:", error);
-      const errorMessage = error.response?.data?.error || error.response?.data?.message || "Error fetching salary data";
-      showAlert(errorMessage, "error");
+      console.error("Error fetching salary data:", {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status
+      });
+      
+      // Handle specific error cases
+      if (error.response?.data?.details?.includes('Cast to ObjectId failed')) {
+        showAlert("Error: Invalid employee ID format. Please check the data.", "error");
+      } else {
+        const errorMessage = error.response?.data?.error || 
+                            error.response?.data?.message || 
+                            error.message || 
+                            "Error fetching salary data";
+        showAlert(errorMessage, "error");
+      }
     } finally {
       setIsLoading(false);
     }
@@ -75,20 +116,29 @@ const SalaryForm = () => {
       setIsLoading(true);
       console.log('Fetching employees...');
       const response = await axios.get("http://localhost:8080/api/Employee");
-      console.log('Employee data received:', response.data);
+      console.log('Raw employee data received:', response.data);
       
       if (!Array.isArray(response.data)) {
         console.error('Invalid response format:', response.data);
         throw new Error('Invalid response format from server');
       }
 
+      // Ensure each employee has the required fields
+      const validEmployees = response.data.filter(emp => {
+        const isValid = emp && emp.employee_id && emp.firstName && emp.lastName;
+        if (!isValid) {
+          console.warn('Invalid employee record:', emp);
+        }
+        return isValid;
+      });
+
       // Sort employees by name for better usability
-      const sortedEmployees = response.data.sort((a, b) => 
+      const sortedEmployees = validEmployees.sort((a, b) => 
         `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`)
       );
-      console.log('Sorted employees:', sortedEmployees);
+      
+      console.log('Processed and sorted employees:', sortedEmployees);
       setEmployees(sortedEmployees);
-      // Clear any previous error
       setErrors(prev => ({ ...prev, employeeFetch: "" }));
     } catch (error) {
       console.error("Error fetching employees:", error);
@@ -134,6 +184,19 @@ const SalaryForm = () => {
       return;
     }
 
+    // Validate employee ID format
+    if (!employeeId || !employeeId.startsWith('EMP')) {
+      showAlert("Error: Invalid employee ID format", "error");
+      return;
+    }
+
+    // Verify employee exists
+    const employeeExists = employees.some(emp => emp.employee_id === employeeId);
+    if (!employeeExists) {
+      showAlert("Error: Selected employee not found", "error");
+      return;
+    }
+
     const newData = {
       employee_id: employeeId,
       month,
@@ -144,26 +207,62 @@ const SalaryForm = () => {
       paymentStatus,
     };
 
+    console.log('Submitting salary data:', newData);
+
     try {
       setIsLoading(true);
-      console.log('Submitting salary data:', newData);
-      if (!isEditing) {
-        const response = await axios.post("http://localhost:8080/api/salaries", newData);
-        console.log('Salary added successfully:', response.data);
-        showAlert("Salary entry added successfully", "success");
-      } else {
-        const response = await axios.put(`http://localhost:8080/api/salaries/${editingId}`, newData);
+      
+      // Check if a record already exists for this employee and month
+      const existingRecord = salaryData.find(
+        record => record.employee_id === employeeId && record.month === month
+      );
+
+      if (existingRecord && !isEditing) {
+        // If record exists and we're not in edit mode, ask for confirmation
+        if (window.confirm(
+          `A salary record for this employee in ${month} already exists. Do you want to update it?`
+        )) {
+          const response = await axios.put(
+            `http://localhost:8080/api/salaries/${existingRecord._id}`,
+            newData
+          );
+          console.log('Salary updated successfully:', response.data);
+          showAlert("Salary entry updated successfully", "success");
+        } else {
+          showAlert("Operation cancelled", "info");
+          return;
+        }
+      } else if (isEditing) {
+        // Normal update flow
+        const response = await axios.put(
+          `http://localhost:8080/api/salaries/${editingId}`,
+          newData
+        );
         console.log('Salary updated successfully:', response.data);
         showAlert("Salary entry updated successfully", "success");
         setIsEditing(false);
         setEditingId(null);
+      } else {
+        // Create new record
+        const response = await axios.post(
+          "http://localhost:8080/api/salaries",
+          newData
+        );
+        console.log('Salary added successfully:', response.data);
+        showAlert("Salary entry added successfully", "success");
       }
 
       resetForm();
       fetchSalaryData();
     } catch (error) {
-      console.error("Error submitting data:", error);
-      const errorMessage = error.response?.data?.error || error.response?.data?.message || "Error submitting data";
+      console.error("Error submitting data:", {
+        error: error.message,
+        response: error.response?.data,
+        status: error.response?.status
+      });
+      const errorMessage = error.response?.data?.error || 
+                          error.response?.data?.message || 
+                          "Error submitting data";
       showAlert(errorMessage, "error");
     } finally {
       setIsLoading(false);
@@ -223,14 +322,18 @@ const SalaryForm = () => {
   const handleEmployeeSelect = (event) => {
     const selectedEmployeeId = event.target.value;
     console.log('Selected employee ID:', selectedEmployeeId);
-    setEmployeeId(selectedEmployeeId);
     
-    // Find the selected employee and set their basic salary
+    // Find the selected employee
     const selectedEmployee = employees.find(emp => emp.employee_id === selectedEmployeeId);
-    console.log('Selected employee:', selectedEmployee);
+    console.log('Selected employee details:', selectedEmployee);
+    
     if (selectedEmployee) {
+      setEmployeeId(selectedEmployee.employee_id);
       setBasicSalary(selectedEmployee.basicSalary?.toString() || "0");
       calculateNetSalary();
+    } else {
+      console.error('Employee not found:', selectedEmployeeId);
+      showAlert("Error: Selected employee not found", "error");
     }
   };
 

@@ -167,6 +167,21 @@ const updateLedger = async (req, res) => {
   }
 };
 
+const toggleLedgerStatus = async (req, res) => {
+  try {
+    const ledger = await Ledger.findById(req.params.id);
+    if (!ledger) {
+      return res.status(404).json({ message: 'Ledger not found' });
+    }
+    
+    ledger.isActive = !ledger.isActive;
+    const updatedLedger = await ledger.save();
+    res.json(updatedLedger);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 const deleteLedger = async (req, res) => {
   try {
     const ledger = await Ledger.findById(req.params.id);
@@ -186,5 +201,6 @@ module.exports = {
   getLedger,
   addLedger,
   updateLedger,
+  toggleLedgerStatus,
   deleteLedger
 };

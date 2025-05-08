@@ -3,53 +3,47 @@ const mongoose = require("mongoose");
 const salarySchema = new mongoose.Schema({
     employee_id: {
         type: String,
-        required: [true, "Employee ID is required"],
-        ref: 'Employee'
+        required: true
     },
     month: {
         type: String,
-        required: [true, "Month is required"],
+        required: true,
         validate: {
             validator: function(v) {
-                // Validate format YYYY-MM
-                return /^\d{4}-(0[1-9]|1[0-2])$/.test(v);
+                return /^\d{4}-\d{2}$/.test(v);
             },
             message: props => `${props.value} is not a valid month format (YYYY-MM)`
         }
     },
     basicSalary: {
         type: Number,
-        required: [true, "Basic salary is required"],
-        min: [0, "Basic salary cannot be negative"]
+        required: true,
+        min: 0
     },
     overtime: {
         type: Number,
         default: 0,
-        min: [0, "Overtime cannot be negative"]
+        min: 0
     },
     epf_etf: {
         type: Number,
         default: 0,
-        min: [0, "EPF/ETF cannot be negative"]
+        min: 0
     },
     net_salary: {
         type: Number,
-        required: [true, "Net salary is required"],
-        min: [0, "Net salary cannot be negative"]
+        required: true
     },
     paymentStatus: {
         type: String,
-        enum: {
-            values: ["Pending", "Paid"],
-            message: "{VALUE} is not a valid payment status"
-        },
-        default: "Pending"
+        enum: ['Paid', 'Pending'],
+        default: 'Pending'
     }
 }, {
     timestamps: true
 });
 
-// Create compound index for employee_id and month to prevent duplicates
+// Create a compound index for employee_id and month
 salarySchema.index({ employee_id: 1, month: 1 }, { unique: true });
 
 // Add validation to ensure net_salary is calculated correctly

@@ -3,7 +3,7 @@ const router = express.Router();
 const {
   validateLedgerEntry,
   getLedgers,
-  getLedgerById,
+  getLedger,
   addLedger,
   updateLedger,
   toggleLedgerStatus,
@@ -23,7 +23,7 @@ router.get('/',
 
 // Get ledger account by ID
 router.get('/:id', 
-  getLedgerById
+  getLedger
 );
 
 // Get ledger accounts by account type

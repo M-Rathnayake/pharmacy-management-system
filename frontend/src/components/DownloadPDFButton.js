@@ -35,7 +35,14 @@ const DownloadPDFButton = ({ documentType, data, fileName, sx }) => {
       doc.setLineWidth(0.5);
       doc.line(14, 35, 200, 35);
 
-      let columns, rows;
+      // Add report generation details
+      doc.setFontSize(10);
+      doc.setTextColor(100, 100, 100); // Gray
+      const currentDate = new Date().toLocaleDateString('en-IN');
+      const currentTime = new Date().toLocaleTimeString('en-IN');
+      doc.text(`Generated on: ${currentDate} at ${currentTime}`, 14, 45);
+
+      let columns, rows, summaryData;
 
       if (documentType === 'profit-loss') {
         columns = [
@@ -51,6 +58,16 @@ const DownloadPDFButton = ({ documentType, data, fileName, sx }) => {
           expenses: (item.expenses || 0).toLocaleString('en-IN'),
           net_Profit: (item.profit || 0).toLocaleString('en-IN'),
         }));
+
+        // Calculate summary for profit-loss
+        const totalRevenue = data.reduce((sum, item) => sum + (item.revenue || 0), 0);
+        const totalExpenses = data.reduce((sum, item) => sum + (item.expenses || 0), 0);
+        const totalProfit = totalRevenue - totalExpenses;
+        summaryData = [
+          ['Total Revenue', totalRevenue.toLocaleString('en-IN')],
+          ['Total Expenses', totalExpenses.toLocaleString('en-IN')],
+          ['Net Profit', totalProfit.toLocaleString('en-IN')]
+        ];
       } else if (documentType === 'balance-sheet') {
         columns = [
           { header: 'Period', dataKey: 'period' },
@@ -76,6 +93,17 @@ const DownloadPDFButton = ({ documentType, data, fileName, sx }) => {
             status: isBalanced ? 'Balanced' : 'Imbalanced'
           };
         });
+
+        // Calculate summary for balance sheet
+        const totalAssets = data.reduce((sum, item) => sum + (item.assets?.total_assets || 0), 0);
+        const totalLiabilities = data.reduce((sum, item) => sum + (item.liabilities?.total_liabilities || 0), 0);
+        const totalEquity = data.reduce((sum, item) => sum + (item.equity?.total_equity || 0), 0);
+        summaryData = [
+          ['Total Assets', totalAssets.toLocaleString('en-IN')],
+          ['Total Liabilities', totalLiabilities.toLocaleString('en-IN')],
+          ['Total Equity', totalEquity.toLocaleString('en-IN')],
+          ['Balance Status', Math.abs(totalAssets - (totalLiabilities + totalEquity)) < 0.01 ? 'Balanced' : 'Imbalanced']
+        ];
       } else if (documentType === 'ledger') {
         columns = [
           { header: 'Account Code', dataKey: 'accountCode' },
@@ -94,11 +122,21 @@ const DownloadPDFButton = ({ documentType, data, fileName, sx }) => {
           balanceType: item.balanceType ? item.balanceType.charAt(0).toUpperCase() + item.balanceType.slice(1) : 'N/A',
           isActive: item.isActive ? 'Active' : 'Inactive'
         }));
+
+        // Calculate summary for ledger
+        const totalAccounts = data.length;
+        const activeAccounts = data.filter(item => item.isActive).length;
+        const totalBalance = data.reduce((sum, item) => sum + (item.openingBalance || 0), 0);
+        summaryData = [
+          ['Total Accounts', totalAccounts.toString()],
+          ['Active Accounts', activeAccounts.toString()],
+          ['Total Opening Balance', totalBalance.toLocaleString('en-IN')]
+        ];
       }
 
       // Add table
       autoTable(doc, {
-        startY: 40,
+        startY: 50,
         head: [columns.map((col) => col.header)],
         body: rows.map((row) => columns.map((col) => row[col.dataKey])),
         headStyles: {
@@ -124,14 +162,41 @@ const DownloadPDFButton = ({ documentType, data, fileName, sx }) => {
         },
       });
 
-      // Add footer
+      // Add summary section
+      const finalY = doc.lastAutoTable.finalY || 50;
+      doc.setFontSize(12);
+      doc.setTextColor(0, 0, 0); // Black
+      doc.text('Summary', 14, finalY + 15);
+
+      // Add summary table
+      autoTable(doc, {
+        startY: finalY + 20,
+        head: [['Item', 'Amount']],
+        body: summaryData,
+        headStyles: {
+          fillColor: [57, 152, 255],
+          textColor: 255,
+          fontSize: 10,
+        },
+        styles: {
+          fontSize: 10,
+          cellPadding: 5,
+        },
+        columnStyles: {
+          0: { cellWidth: 'auto' },
+          1: { cellWidth: 'auto', halign: 'right' }
+        },
+      });
+
+      // Add footer with page numbers and generation details
       const pageCount = doc.internal.getNumberOfPages();
       for (let i = 1; i <= pageCount; i++) {
         doc.setPage(i);
         doc.setFont('helvetica', 'normal'); // Reset font for footer
-        doc.setFontSize(10);
+        doc.setFontSize(8);
+        doc.setTextColor(100, 100, 100); // Gray
         doc.text(
-          `Page ${i} of ${pageCount}`,
+          `Page ${i} of ${pageCount} | Generated on ${currentDate} at ${currentTime}`,
           doc.internal.pageSize.width - 30,
           doc.internal.pageSize.height - 10
         );

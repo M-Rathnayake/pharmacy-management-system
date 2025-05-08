@@ -7,15 +7,27 @@ const getSalaries = async (req, res) => {
     try {
         console.log('[Salary] Fetching all salary records');
         const salaries = await Salary.find()
-            .sort({ month: -1 })
-            .populate({
-                path: 'employee_id',
-                select: 'firstName lastName position department',
-                model: 'Employee'
-            });
+            .sort({ month: -1 });
         
-        console.log(`[Salary] Found ${salaries.length} salary records`);
-        res.status(200).json(salaries);
+        // Get employee details for each salary record
+        const salariesWithDetails = await Promise.all(
+            salaries.map(async (salary) => {
+                // Find employee by employee_id (string) instead of _id
+                const employee = await Employee.findOne({ employee_id: salary.employee_id });
+                return {
+                    ...salary.toObject(),
+                    employeeDetails: employee ? {
+                        firstName: employee.firstName,
+                        lastName: employee.lastName,
+                        position: employee.position,
+                        department: employee.department
+                    } : null
+                };
+            })
+        );
+        
+        console.log(`[Salary] Found ${salariesWithDetails.length} salary records`);
+        res.status(200).json(salariesWithDetails);
     } catch (error) {
         console.error('[Salary] Error fetching salaries:', error);
         res.status(500).json({ 
@@ -41,7 +53,7 @@ const addSalary = async (req, res) => {
             });
         }
 
-        // Check if employee exists
+        // Check if employee exists by employee_id (string)
         const employee = await Employee.findOne({ employee_id: employee_id });
         if (!employee) {
             console.error('[Salary] Employee not found:', employee_id);
@@ -74,15 +86,18 @@ const addSalary = async (req, res) => {
         const savedSalary = await newSalary.save();
         console.log('[Salary] New salary record added:', savedSalary._id);
         
-        // Populate employee details before sending response
-        const populatedSalary = await Salary.findById(savedSalary._id)
-            .populate({
-                path: 'employee_id',
-                select: 'firstName lastName position department',
-                model: 'Employee'
-            });
+        // Get employee details for the response
+        const employeeDetails = {
+            firstName: employee.firstName,
+            lastName: employee.lastName,
+            position: employee.position,
+            department: employee.department
+        };
         
-        res.status(201).json(populatedSalary);
+        res.status(201).json({
+            ...savedSalary.toObject(),
+            employeeDetails
+        });
     } catch (error) {
         console.error('[Salary] Error adding salary:', error);
         if (error.name === 'ValidationError') {
@@ -115,7 +130,7 @@ const updateSalary = async (req, res) => {
             });
         }
 
-        // Check if employee exists
+        // Check if employee exists by employee_id (string)
         const employee = await Employee.findOne({ employee_id: employee_id });
         if (!employee) {
             console.error('[Salary] Employee not found:', employee_id);
@@ -134,19 +149,26 @@ const updateSalary = async (req, res) => {
                 paymentStatus: paymentStatus || 'Pending'
             },
             { new: true, runValidators: true }
-        ).populate({
-            path: 'employee_id',
-            select: 'firstName lastName position department',
-            model: 'Employee'
-        });
+        );
 
         if (!updatedSalary) {
             console.error('[Salary] Salary record not found:', req.params.id);
             return res.status(404).json({ error: 'Salary record not found' });
         }
 
+        // Get employee details for the response
+        const employeeDetails = {
+            firstName: employee.firstName,
+            lastName: employee.lastName,
+            position: employee.position,
+            department: employee.department
+        };
+
         console.log('[Salary] Salary record updated:', updatedSalary._id);
-        res.status(200).json(updatedSalary);
+        res.status(200).json({
+            ...updatedSalary.toObject(),
+            employeeDetails
+        });
     } catch (error) {
         console.error('[Salary] Error updating salary:', error);
         if (error.name === 'ValidationError') {
