@@ -70,20 +70,70 @@ const createBalanceSheet = async (req, res) => {
 const getBalanceSheets = async (req, res) => {
     console.log('GET /api/balancesheets - Query:', JSON.stringify(req.query, null, 2));
     try {
-        const { period, startDate, endDate } = req.query;
+        const { period, startDate, endDate, minAssets, maxAssets, minLiabilities, maxLiabilities } = req.query;
         
         let query = {};
-        if (period) query.period = period;
+        
+        // Period filter
+        if (period) {
+            query.period = period;
+        }
+        
+        // Date range filter
         if (startDate && endDate) {
             query.period_date = {
                 $gte: new Date(startDate),
                 $lte: new Date(endDate)
             };
+        } else if (startDate) {
+            query.period_date = { $gte: new Date(startDate) };
+        } else if (endDate) {
+            query.period_date = { $lte: new Date(endDate) };
         }
         
-        const sheets = await BalanceSheet.find(query).sort({ period_date: -1 });
+        // Assets range filter
+        if (minAssets || maxAssets) {
+            query['assets.total_assets'] = {};
+            if (minAssets) query['assets.total_assets'].$gte = parseFloat(minAssets);
+            if (maxAssets) query['assets.total_assets'].$lte = parseFloat(maxAssets);
+        }
+        
+        // Liabilities range filter
+        if (minLiabilities || maxLiabilities) {
+            query['liabilities.total_liabilities'] = {};
+            if (minLiabilities) query['liabilities.total_liabilities'].$gte = parseFloat(minLiabilities);
+            if (maxLiabilities) query['liabilities.total_liabilities'].$lte = parseFloat(maxLiabilities);
+        }
+        
+        const sheets = await BalanceSheet.find(query)
+            .sort({ period_date: -1 })
+            .select('-__v'); // Exclude version field
+            
         console.log('Fetched balance sheets:', sheets.length);
-        res.json(sheets);
+        
+        // Calculate summary statistics
+        const summary = {
+            totalCount: sheets.length,
+            totalAssets: sheets.reduce((sum, sheet) => sum + (sheet.assets?.total_assets || 0), 0),
+            totalLiabilities: sheets.reduce((sum, sheet) => sum + (sheet.liabilities?.total_liabilities || 0), 0),
+            totalEquity: sheets.reduce((sum, sheet) => sum + (sheet.equity?.total_equity || 0), 0),
+            averageAssets: sheets.length ? sheets.reduce((sum, sheet) => sum + (sheet.assets?.total_assets || 0), 0) / sheets.length : 0,
+            averageLiabilities: sheets.length ? sheets.reduce((sum, sheet) => sum + (sheet.liabilities?.total_liabilities || 0), 0) / sheets.length : 0
+        };
+        
+        res.json({
+            data: sheets,
+            summary,
+            filters: {
+                period,
+                startDate,
+                endDate,
+                minAssets,
+                maxAssets,
+                minLiabilities,
+                maxLiabilities
+            }
+        });
     } catch (error) {
         console.error('Error fetching balance sheets:', error.message);
         res.status(500).json({ error: error.message });

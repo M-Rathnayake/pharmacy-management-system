@@ -1,86 +1,62 @@
-import React, { useState } from 'react';
-import {
-  Navbar,
-  NavbarBrand,
-  NavbarToggler,
-  Collapse,
-} from 'reactstrap';
+import React from 'react';
 
 const Header = () => {
-  const [isOpen, setIsOpen] = useState(false);
-  const toggle = () => setIsOpen(!isOpen);
-  
   return (
-    <Navbar 
-      dark 
-      expand="md" 
-      fixed="top"
+    <div
       style={{
-        backgroundColor: '#2c3e50',
-        boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
-        padding: '0.5rem 2rem', // Reduced padding
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        height: '50px',
+        backgroundColor: '#000000',
+        color: 'white',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: '0 2rem',
         zIndex: 1100,
-        height: '50px', // Reduced height
-        alignItems: 'center' // Ensure all items align vertically
+        boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
       }}
     >
-      {/* Left-aligned PharmacyShop - now inline with other elements */}
-      <NavbarBrand 
+      {/* Left-aligned Brand */}
+      <div
         style={{
           fontWeight: '700',
-          fontSize: '1.5rem', // Slightly smaller font
-          color: 'white',
-          cursor: 'default',
-          marginRight: 'auto',
+          fontSize: '1.5rem',
           letterSpacing: '0.5px',
-          padding: '0', // Remove padding
-          lineHeight: '1' // Tighten line height
         }}
       >
-        PharmacyShop
-      </NavbarBrand>
+        EsyPharma
+      </div>
 
-      {/* Navigation items - now inline with brand */}
-      <div 
+      {/* Right-aligned Navigation */}
+      <div
         style={{
           display: 'flex',
-          gap: '2rem', // Reduced gap
-          alignItems: 'center',
-          height: '100%'
+          gap: '2rem',
         }}
       >
-        <div 
-          className="nav-item"
+        <div
           style={{
-            color: 'rgba(255,255,255,0.9)',
             fontWeight: '600',
-            fontSize: '1rem', // Smaller font
-            cursor: 'default',
-            padding: '0',
-            borderBottom: '2px solid transparent',
-            transition: 'all 0.3s ease',
-            lineHeight: '1'
+            fontSize: '1rem',
+            cursor: 'pointer',
           }}
         >
-          Medicines
+          Login
         </div>
-        <div 
-          className="nav-item"
+        <div
           style={{
-            color: 'rgba(255,255,255,0.9)',
             fontWeight: '600',
-            fontSize: '1rem', // Smaller font
-            cursor: 'default',
-            padding: '0',
-            borderBottom: '2px solid transparent',
-            transition: 'all 3s ease',
-            lineHeight: '1'
+            fontSize: '1rem',
+            cursor: 'pointer',
           }}
         >
-          Dashboard
+          Logout
         </div>
       </div>
-    </Navbar>
+    </div>
   );
 };
 
