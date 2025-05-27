@@ -12,7 +12,7 @@ This dashboard fetches profit loss data and provides future insights using AI. (
 
 ## Technologies
 * Frontend : React JS , Material UI
-* Backend : nodeJS . ExpressJS
+* Backend : nodeJS , ExpressJS
 * Database : MongoDB
 * Development Environment : VScode
 * Version Control : GitHub
