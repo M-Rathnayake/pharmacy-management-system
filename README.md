@@ -7,9 +7,6 @@ This dashboard supports management of 6 core financial process :
 5. Salary management
 6. Petty cash management
 
-## Bonus features
-This dashboard fetches profit loss data and provides future insights using AI. (OpenAI API is used for this function)
-
 ## Technologies
 * Frontend : React JS , Material UI
 * Backend : nodeJS , ExpressJS
@@ -18,10 +15,17 @@ This dashboard fetches profit loss data and provides future insights using AI. (
 * Version Control : GitHub
 * API Testing : Postman
 
-## Other Features
-1. Added CRUD for all 6 processes
-2. Displays a summary of important information by using visualizations which helps to take decisions
-3. Report generation
+## Current System Strengths & Limitations
+✅ What Works Well:
+* Core Financial Tracking: Solid foundation in Balance Sheet, P&L, and historical trend analysis.
+* Basic AI Integration: GPT-3.5 for tips and simple anomaly detection adds preliminary value.
+* Data Availability: Key financial data points (assets, liabilities, revenue/expenses) are already structured.
+
+## 🔍 Key Limitations:
+* Shallow Predictive Power: 5% growth projection is too generic (no confidence intervals, drivers, or scenario modeling).
+* Reactive Anomaly Detection: Only flags spikes post-occurrence (no root-cause analysis or prevention).
+* Underutilized Data: Historical trends aren’t leveraged for forecasting or optimization.
+* GPT-3.5’s Generic Outputs: Financial tips lack contextual relevance to your specific data.
 
 
    
