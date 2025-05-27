@@ -16,7 +16,7 @@ This dashboard supports management of 6 core financial process :
 * API Testing : Postman
 
 ## Current System Strengths & Limitations
-✅ What Works Well:
+## ✅ What Works Well:
 * Core Financial Tracking: Solid foundation in Balance Sheet, P&L, and historical trend analysis.
 * Basic AI Integration: GPT-3.5 for tips and simple anomaly detection adds preliminary value.
 * Data Availability: Key financial data points (assets, liabilities, revenue/expenses) are already structured.
