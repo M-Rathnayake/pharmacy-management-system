@@ -19,8 +19,9 @@ This dashboard fetches profit loss data and provides future insights using AI. (
 * API Testing : Postman
 
 ## Other Features
-1. Added CRUD for all 6 processes.
-2. Displays a summary of important information by using visualizations which helps to take decisions.
+1. Added CRUD for all 6 processes
+2. Displays a summary of important information by using visualizations which helps to take decisions
+3. Report generation
 
 
    
