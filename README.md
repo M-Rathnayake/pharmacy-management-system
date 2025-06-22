@@ -18,14 +18,14 @@ This dashboard supports management of 6 core financial process :
 ## Current System Strengths & Limitations
 ## **System Analysis: AI-Powered Financial Dashboard**
 
-### **✅ Strengths (What works well)**  
+### ** Strengths (What works well)**  
 - **Core Financial Tracking**: Robust handling of Balance Sheets, P&L statements, and historical trends.  
 - **Basic AI Integration**:  
   - GPT-3.5 generates financial tips.  
   - Simple anomaly detection for revenue/expense spikes.  
 - **Structured Data**: Assets, liabilities, and equity components are well-organized for analysis.
 
-### **🔍 Limitations & Future Improvements (Not yet implemented)**  
+### ** Limitations & Future Improvements (Not yet implemented)**  
 - **Predictive Analytics**: Current growth projections (5%) lack:  
   - Confidence intervals or scenario modeling.  
   - Driver analysis (e.g., "Marketing spend drives 70% of revenue growth").  
